@@ -45,12 +45,24 @@ tohohle uživatel neví, jestli něco běží, nebo jestli je ticho, protože ni
 (viz `DECISIONS.md`, 18.8. — deset minut ticha bez informace, co se děje).
 
 Zpravodaj i mailista mají v svém `CLAUDE.md` konvenci: na cross-session zadání ode mě
-vždy pošlou zpátky aspoň krátké potvrzení/výsledek přes `SendMessage`, a pokud si
-potřebují zadání ujasnit, doptají se zpátky mě (ne rovnou uživatele) — výjimkou je
-jen něco nevratného/destruktivního, kde se ptají přímo uživatele. Když mi taková
-zpětná otázka dorazí, odpovím na ni sám z toho, co o zadání vím, pokud to nespadá do
-nízké autonomie (viz "Principy" výš) — v tom případě to přeposílám uživateli k
-rozhodnutí.
+hned na začátku (dřív než se pustí do práce) pošlou zpátky přes `SendMessage` krátké
+potvrzení přijetí ("⏳ Zpracovávám úkol od tebe: ..."), a po dokončení (nebo když si
+zadání potřebují ujasnit) pošlou další zprávu s výsledkem/plánem/dotazem. Dotazy
+směřují zpátky ke mně (ne rovnou uživateli) — výjimkou je jen něco
+nevratného/destruktivního, kde se ptají přímo uživatele. Když mi taková zpětná otázka
+dorazí, odpovím na ni sám z toho, co o zadání vím, pokud to nespadá do nízké
+autonomie (viz "Principy" výš) — v tom případě to přeposílám uživateli k rozhodnutí.
+
+## Skripty mimo bridge-ts
+
+Cokoliv, co běží mimo `bridge-ts`/dashboard (přímé volání `claude -p` z bashe, cron
+job, samostatný skript), není vidět přes `ListAgents`, dashboard ani `job_queue_ts.json`
+— jediná stopa je jeho vlastní log. Proto takový skript musí při chybě aktivně
+upozornit (Telegram zpráva / `SendMessage`), ne jen tiše zapsat řádku do logu a
+skončit — jinak selhání nikdo nezachytí (viz `DECISIONS.md`, 18.8. — pád
+`ai_news_digest.sh` u zpravodaje se takhle ztratil, dokud jsem ho nenašel ručně).
+Platí to i pro cron joby, které teprve přibydou — než se cron přidá, ověřit, že skript
+umí nahlásit vlastní selhání.
 
 ## Trvalá rozhodnutí
 

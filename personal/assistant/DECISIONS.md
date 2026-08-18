@@ -552,6 +552,34 @@ konverzaci, ze které se na dashboard kliká.
 Date:
 2026-08-18
 
+---
+
+## Pravidlo: skripty mimo bridge-ts musí při chybě aktivně upozornit, ne jen logovat
+
+What:
+Zpravodajův testovací `ai_news_digest.sh` (přímé volání `claude -p --model opus` z
+bashe, mimo `bridge-ts`) v 15:11 UTC spadl (`FAIL status=1` v `ai_news_log.txt`), ale
+selhání se nikam neprojevilo — žádná Telegram zpráva, žádný záznam v
+`job_queue_ts.json`/dashboardu (protože ten skript běží úplně mimo tenhle
+mechanismus). Assistant to našel jen ručním čtením logu, ne aktivním upozorněním.
+Ruční opakování stejného volání proběhlo bez chyby, takže příčina vypadá na
+jednorázový/přechodný problém, ne trvalou chybu ve skriptu.
+
+Rozhodnuto: obecné pravidlo doplněno do `CLAUDE.md` všech tří botů (assistant,
+zpravodaj, mailista) — jakýkoliv skript běžící mimo `bridge-ts`/dashboard (přímé
+`claude -p`, cron job) musí při chybě aktivně poslat upozornění (Telegram/
+`SendMessage`), ne jen zapsat řádku do logu. Zpravodaj dostal zadání prošetřit
+konkrétní pád a doplnit alerting do `ai_news_digest.sh`; cron pro tenhle skript se
+nepřidá, dokud to nebude vyřešené a otestované.
+
+Why:
+Stejný vzorec jako dřívější dashboardové "právě zpracovává" zjištění — cokoliv, co
+běží mimo `bridge-ts`, je pro assistenta/dashboard neviditelné, dokud se aktivně
+nezeptá. Bez tohohle pravidla by budoucí cron joby mohly tiše selhávat donekonečna.
+
+Date:
+2026-08-18
+
 ## Dashboard přístup: Tailscale místo SSH tunelu
 
 What:
