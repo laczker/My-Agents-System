@@ -1,0 +1,17 @@
+{"type":"turn","ts":"2026-08-18T08:51:27.733Z","contextTokens":51333,"durationMs":22028,"durationApiMs":21922,"isError":false}
+{"type":"turn","ts":"2026-08-18T08:54:29.132Z","contextTokens":469900,"durationMs":83707,"durationApiMs":83139,"isError":false}
+{"type":"cycle","ts":"2026-08-18T09:01:06.895Z","contextTokensAtCycle":469900}
+{"type":"turn","ts":"2026-08-18T09:01:47.176Z","contextTokens":140803,"durationMs":38673,"durationApiMs":39517,"isError":false}
+{"type":"turn","ts":"2026-08-18T09:08:10.958Z","contextTokens":80803,"durationMs":15790,"durationApiMs":55201,"isError":false}
+{"type":"turn","ts":"2026-08-18T09:13:40.450Z","contextTokens":1085536,"durationMs":235216,"durationApiMs":257988,"isError":false}
+{"type":"turn","ts":"2026-08-18T09:35:05.111Z","contextTokens":580886,"durationMs":116707,"durationApiMs":115775,"isError":true}
+{"type":"cycle","ts":"2026-08-18T11:00:30.018Z","contextTokensAtCycle":580886}
+{"type":"turn","ts":"2026-08-18T11:01:09.029Z","contextTokens":222997,"durationMs":38213,"durationApiMs":38883,"isError":false}
+{"type":"cycle","ts":"2026-08-18T11:09:12.080Z","contextTokensAtCycle":222997}
+{"type":"turn","ts":"2026-08-18T11:09:42.221Z","contextTokens":30515,"durationMs":28438,"durationApiMs":30113,"isError":false}
+{"type":"turn","ts":"2026-08-18T11:12:48.485Z","contextTokens":138183,"durationMs":50796,"durationApiMs":80628,"isError":false}
+{"type":"turn","ts":"2026-08-18T11:21:27.591Z","contextTokens":547800,"durationMs":102163,"durationApiMs":101648,"isError":false}
+{"type":"cycle","ts":"2026-08-18T11:23:02.040Z","contextTokensAtCycle":547800}
+{"type":"turn","ts":"2026-08-18T11:24:25.518Z","contextTokens":264711,"durationMs":81850,"durationApiMs":34762,"isError":false}
+{"type":"cycle","ts":"2026-08-18T11:26:40.167Z","contextTokensAtCycle":264711}
+{"type":"turn","ts":"2026-08-18T11:26:55.325Z","contextTokens":63680,"durationMs":13440,"durationApiMs":15619,"isError":false}

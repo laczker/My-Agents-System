@@ -1,0 +1,20 @@
+{
+  "name": "bridge-ts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "@types/node": "^26.2.0",
+    "dotenv": "^17.4.2",
+    "grammy": "^1.45.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

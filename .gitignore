@@ -1,0 +1,8 @@
+.env
+.env.*
+*.log
+__pycache__/
+*.sqlite
+*.sqlite3
+bridge.py.bak.*
+node_modules/
