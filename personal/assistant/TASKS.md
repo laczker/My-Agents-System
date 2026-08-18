@@ -39,6 +39,15 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Hotovo
 
+- **Zpravodaj: webová stránka pro čtení digestů** (18.8., dokončeno zpravodajem
+  21:5x) — server zapojen do `watchdog.sh` (bug: `pgrep` porovnával relativní
+  cestu stejně jako proces, nikdy se nenašly → EADDRINUSE; oprava přes absolutní
+  cestu, stejný vzor jako dashboard). `daily_digest.sh`/`ai_news_digest.sh` teď
+  ukládají plný text přes `webapp/server/src/addDigest.ts` a do Telegramu posílají
+  jen jednořádkové shrnutí + odkaz. Běží na `100.108.179.97:8766`. Kontextový
+  spike z 20:17 UTC (co způsobil dřívější pád/OOM) se zpravodajovi nepodařilo
+  zpětně vystopovat — pravděpodobně `node_modules`/webapp objem, ale jistota
+  není. `webapp/` zatím není v gitu (čeká na pokyn, jestli commitnout).
 - **Delegace na jiné boty: viditelnost + odezva** (18.8.) — tři věci, co vyplynuly
   z toho, že po zadání zpravodajovi bylo 10 minut ticho v obou chatech: (1) do
   `personal/assistant/CLAUDE.md` přidána sekce "Delegace na jiné boty" — při
