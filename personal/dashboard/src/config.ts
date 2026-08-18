@@ -22,6 +22,8 @@ export const STALE_AFTER_MS = 60_000;
 
 export const DB_FILE = "/home/agent/agent-system/personal/dashboard/dashboard.sqlite";
 
-// Jen localhost — dashboard nemá auth, viz DECISIONS.md.
-export const HOST = "127.0.0.1";
+// Jen Tailscale rozhraní (tailnet) — dashboard nemá auth, viz DECISIONS.md.
+// Veřejné rozhraní (0.0.0.0) záměrně vynecháno, ať i při děravém/změněném
+// firewallu zůstane dashboard z veřejného internetu nedosažitelný.
+export const HOST = "100.108.179.97";
 export const PORT = 8765;

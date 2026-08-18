@@ -551,3 +551,36 @@ konverzaci, ze které se na dashboard kliká.
 
 Date:
 2026-08-18
+
+## Dashboard přístup: Tailscale místo SSH tunelu
+
+What:
+Uživatel chtěl dashboard zobrazovat odkudkoliv bez nutnosti chodit do terminálu (SSH
+tunel `-L 8765:127.0.0.1:8765` vyžadoval terminál při každém přístupu). Instalace
+Tailscale na server vyžadovala root, který `agent` účet nemá (viz Alternatives) —
+uživatel to sám spustil se svým vlastním sudo přístupem. Server má teď tailnet IP
+`100.108.179.97`. `HOST` v `src/config.ts` změněn z `127.0.0.1` na tuhle IP, takže
+dashboard teď poslouchá jen na tailscale rozhraní — ne na `127.0.0.1` (SSH tunel na
+`127.0.0.1:8765` už tedy nefunguje) a ne na `0.0.0.0` (veřejný internet). Proces
+restartován přes `pkill` + cron watchdog (stejný bezpečný postup jako restart
+tlačítko), ověřeno `curl http://100.108.179.97:8765` → 200.
+
+Why:
+Důvěryhodnostní hranice dashboardu (bez auth, viz sekce výše) byla "kdo má SSH
+přístup na server". Tailscale posouvá tuhle hranici na "kdo je v uživatelově
+tailnetu" — pořád privátní síť, ne veřejné vystavení, ale přístupná z telefonu/
+notebooku bez SSH. Zvažovaná alternativa (Cloudflare Tunnel s veřejnou URL) zamítnuta,
+protože by vyžadovala přidat auth k dashboardu (dnes žádná není) — Tailscale tohle
+riziko nemá, protože síť samotná už je přístupová kontrola.
+
+Alternatives:
+1. Cloudflare Tunnel s veřejnou URL — zamítnuto, vyžaduje přidat login/auth k
+   dashboardu, což je mimo rozsah tohoto požadavku.
+2. `agent` účet by mohl mít trvalé sudo, aby šlo systémové balíčky (Tailscale)
+   instalovat bez zásahu uživatele — zamítnuto, autonomní proces bez dozoru mezi
+   zprávami by s neomezeným sudo mohl při chybě/bugu rozbít celý server, ne jen svůj
+   vlastní kód; zůstává v souladu s principem nízké autonomie pro bezpečnostní
+   nastavení.
+
+Date:
+2026-08-18
