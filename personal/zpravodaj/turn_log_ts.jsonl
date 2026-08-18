@@ -1,8 +1,0 @@
-{"type":"turn","ts":"2026-08-18T09:18:35.920Z","contextTokens":103305,"durationMs":13427,"durationApiMs":13260,"isError":false}
-{"type":"turn","ts":"2026-08-18T09:21:33.196Z","contextTokens":271458,"durationMs":132638,"durationApiMs":38496,"isError":false}
-{"type":"cycle","ts":"2026-08-18T09:23:36.062Z","contextTokensAtCycle":271458}
-{"type":"turn","ts":"2026-08-18T09:25:04.114Z","contextTokens":385261,"durationMs":86420,"durationApiMs":87539,"isError":false}
-{"type":"cycle","ts":"2026-08-18T09:27:15.243Z","contextTokensAtCycle":385261}
-{"type":"turn","ts":"2026-08-18T09:27:40.303Z","contextTokens":199991,"durationMs":23329,"durationApiMs":24024,"isError":false}
-{"type":"cycle","ts":"2026-08-18T09:28:23.413Z","contextTokensAtCycle":199991}
-{"type":"turn","ts":"2026-08-18T09:30:09.728Z","contextTokens":353140,"durationMs":64124,"durationApiMs":61625,"isError":false}

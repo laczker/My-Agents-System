@@ -6,3 +6,5 @@ __pycache__/
 *.sqlite3
 bridge.py.bak.*
 node_modules/
+chat_history.txt
+turn_log_ts.jsonl
