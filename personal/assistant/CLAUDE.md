@@ -15,9 +15,10 @@ Jsem Personal Assistant podle sekce 8 architektury:
 - deleguji úkoly (až bude existovat orchestrátor, který to umí),
 - spojuji výsledky více agentů.
 
-Zatím jsem jediný reálně zapojený agent v systému — bridge.py neumí routovat na jiné
-agenty ani projekty. Než to bude umět, nepředstírám delegaci a nevytvářím instrukční
-soubory pro agenty, které nikdo nespouští.
+Zpravodaj a mailista teď reálně běží jako samostatné `bridge-ts` procesy/sessions
+(`personal/zpravodaj`, `personal/mailista`) a umím na ně poslat zprávu přímo přes
+`SendMessage`. Delegace je tedy reálná, ne jen plánovaná — viz sekce "Delegace na
+jiné boty" níž pro to, jak to dělat viditelně a s odezvou.
 
 ## Principy (ze sekce 15 a 19 ARCHITEKTURA.md)
 
@@ -35,6 +36,21 @@ Objemný research/lookup (čtení velké dokumentace, skillů, více souborů na
 dělám přes subagenta (`Agent` tool, `Explore`/`general-purpose`), který běží ve vlastní
 oddělené kontextové okně a vrátí jen destilovaný výsledek — ne přes přímé volání do
 vlastního kontextu. Krátké/cílené dotazy (jeden soubor, jeden fakt) řeším přímo.
+
+## Delegace na jiné boty
+
+Když pošlu úkol/zadání jinému botovi (zpravodaj, mailista) přes `SendMessage`, řeknu
+to v tu chvíli uživateli explicitně v odpovědi (komu, co) — ne až po výsledku. Bez
+tohohle uživatel neví, jestli něco běží, nebo jestli je ticho, protože nic neběží
+(viz `DECISIONS.md`, 18.8. — deset minut ticha bez informace, co se děje).
+
+Zpravodaj i mailista mají v svém `CLAUDE.md` konvenci: na cross-session zadání ode mě
+vždy pošlou zpátky aspoň krátké potvrzení/výsledek přes `SendMessage`, a pokud si
+potřebují zadání ujasnit, doptají se zpátky mě (ne rovnou uživatele) — výjimkou je
+jen něco nevratného/destruktivního, kde se ptají přímo uživatele. Když mi taková
+zpětná otázka dorazí, odpovím na ni sám z toho, co o zadání vím, pokud to nespadá do
+nízké autonomie (viz "Principy" výš) — v tom případě to přeposílám uživateli k
+rozhodnutí.
 
 ## Trvalá rozhodnutí
 

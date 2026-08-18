@@ -7,20 +7,60 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-- **Git pro `agent-system`** (18.8.) — celý `agent-system` (všichni tři boti,
-  `bridge-ts`, `personal/dashboard/` až vznikne) je momentálně úplně mimo git,
-  reálné riziko ztráty práce. Uživatel chce vyřešit sám, až bude mít čas — `git init`
-  v kořeni + `.gitignore` na `.env*`, `*.log`, `__pycache__/`, `*.sqlite`,
-  `bridge.py.bak.*` PŘED prvním commitem (kvůli tokenům v `.env` souborech).
-- **Obsahové zadání zpravodaje** (jaké zdroje sledovat, jak často, jaký formát
-  výstupu) — bot samotný na to uživatele čeká přímo ve svém vlastním chatu
-  (`personal/zpravodaj/`), ne tady.
-- **Obsahové zadání mailisty** (co přesně má s poštou dělat — upozorňovat, navrhovat
-  odpovědi, třídit...) — bot samotný na to uživatele čeká přímo ve svém vlastním
-  chatu (`personal/mailista/`), ne tady.
+(momentálně nic)
+
+## Rozpracováno
+
+- **Google/research agent (deep research)** — zjištěno (18.8., subagent prohledal
+  `/tmp/Agent2Telegram`, ne `/tmp/AgentsMonitoring` — to je jen supervisor bez
+  research/model logiky): Ludwigův bridge nemá žádný vlastní deep-research vzor,
+  research plně deleguje na nativní nástroje CLI (`WebSearch`/`WebFetch`/sub-agent
+  `Task`) — stejně jako to dělám já přes `Agent` tool. Model per bot je u něj čistě
+  statický přes přepsání `command` pole v configu (`--model` flag), žádné
+  automatické přepínání podle úkolu. Čeká se na uživatele, jestli chce (a) ad-hoc
+  subagent zde v assistant chatu, nebo (b) samostatný bot s vlastním configem/
+  Telegram chatem a `--model opus` staticky nastaveným.
+- **Nahrávání souborů/obrázků přes Telegram** — potřeba zjistit, jestli `bridge-ts`
+  dnes umí přijmout přílohu a předat ji do `claude -p`. Zatím neprozkoumáno.
+- **Zpravodaj: obsahové zadání AI novinky + obecné zprávy** (18.8.) — zadání
+  poslané přímo do chatu `zpravodaj-31` (SendMessage): AI novinky světové i lokální
+  se zaměřením na programování a vylepšování tohoto systému (deep research u
+  technických věcí, ne povrchní), + obecné zprávy ČR/svět (stačí zajímavé), bez
+  nucené denní frekvence. Zpravodaj si to zapsal do vlastních `DECISIONS.md`/
+  `TASKS.md`, ale samotnou implementaci (nový monitoring/rozhodování "co je dost
+  relevantní") chce mít potvrzenou přímo od Lukáše v jeho chatu, ne přes relay —
+  jde o novou autonomní automatizaci. **Čeká na uživatele** — buď napsat přímo
+  zpravodajovi, nebo potvrdit tady a přepošlu.
+
+## Odloženo (po výše uvedeném)
+
+- **Infra-review agent** — občas projde systém a navrhne vylepšení, může reagovat
+  na AI-novinky agenta/zpravodaje. Založit až jako druhý/třetí specialista, ne první.
 
 ## Hotovo
 
+- **Delegace na jiné boty: viditelnost + odezva** (18.8.) — tři věci, co vyplynuly
+  z toho, že po zadání zpravodajovi bylo 10 minut ticho v obou chatech: (1) do
+  `personal/assistant/CLAUDE.md` přidána sekce "Delegace na jiné boty" — při
+  `SendMessage` jinému botovi to řeknu uživateli hned, ne až po výsledku;
+  (2) do `zpravodaj/CLAUDE.md` a `mailista/CLAUDE.md` přidána konvence: na
+  cross-session zadání od assistenta vždy pošlou zpátky potvrzení/výsledek přes
+  `SendMessage`, a nejasnosti si ujasňují zpátky s assistentem (ne rovnou s
+  uživatelem) — výjimka je jen něco nevratného/destruktivního, kde se ptají
+  přímo uživatele; (3) dashboard dostal sloupec "Právě dělá" (`personal/dashboard/
+  src/processing.ts`, čte neprázdnost `job_queue_ts.json` — žádná nová
+  instrumentace) s náhledem textu aktuálně zpracovávané zprávy. Dashboard
+  restartován a ověřeno na běžícím serveru (`curl` ukazuje "⚙️ zpracovává" +
+  náhled u assistant bota, zatímco zpracovává právě tuhle zprávu).
+- **Git pro `agent-system`** (17.8., zjištěno jako hotové 18.8.) — repo existuje
+  (initial commit `3e964bc`), `.gitignore` pokrývá `.env*`/logy/sqlite/`node_modules/`,
+  napojeno na GitHub (`origin` → `laczker/My-Agents-System`).
+- **Obsahové zadání zpravodaje a mailisty** — vyřešeno přímo s uživatelem v chatech
+  jednotlivých botů.
+- **Trvalý přístup do `personal/dashboard/` bez SSH tunelu** (18.8.) — vyřešeno
+  Tailscale (viz `DECISIONS.md`), ne basic auth. Dashboard teď poslouchá na
+  tailnet IP `100.108.179.97:8765`, dostupný z jakéhokoliv zařízení v uživatelově
+  tailnetu bez terminálu/tunelu.
 - **Dashboard: sledování vyčerpání kvóty Claude Pro** (18.8.) — `personal/dashboard/`
   nově počítá kumulaci tokenů (`input + cache_creation`, bez `cache_read`) napříč
   všemi třemi boty (sdílí jeden účet) z existujícího `turn_log_ts.jsonl`, s resetem
@@ -53,12 +93,6 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Odloženo
 
-- **Trvalý přístup do `personal/dashboard/` bez SSH tunelu** (18.8.) — dashboard dnes
-  poslouchá jen na `127.0.0.1:8765`, uživatel se k němu prozatím dostane přes
-  `ssh -L 8765:127.0.0.1:8765 <uživatel>@<server>` + `localhost:8765` v prohlížeči.
-  Trvalé řešení (poslouchat i zvenku) by potřebovalo basic auth + řešení HTTPS/firewall —
-  změna bezpečnostního nastavení, nízká autonomie dle `CLAUDE.md`, čeká na uživatelovo
-  konkrétní zadání (auth metoda, port), až se k tomu dostane.
 - **Agent na zakládání agentů** (Ludwigův `agentsmon new` vzor) — až budou existovat
   1-2 reální specialisté, na kterých se ustálí postup zakládání. Zatím zakládání dělá
   Claude přímo.

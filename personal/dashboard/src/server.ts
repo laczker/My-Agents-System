@@ -6,6 +6,7 @@ import { recentRestarts, restartCountSince } from "./db.js";
 import { summarize, tailRaw } from "./turnlog.js";
 import { buildUsageWindow } from "./usage.js";
 import { renderUsageChart } from "./usageChart.js";
+import { readProcessingState } from "./processing.js";
 
 const STATUS_LABEL: Record<BotStatus, string> = {
   running: "🟢 běží",
@@ -37,6 +38,18 @@ function fmtTokens(n: number): string {
   return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n));
 }
 
+// Fronta obsahuje surový uživatelský text (Telegram zpráva) — escapovat před
+// vložením do HTML, ať si uživatel/útočník nemůže poslat zprávu, co si vloží
+// vlastní markup do dashboardu.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function renderPage(): string {
   const now = Date.now();
   const dayAgo = now - 24 * 60 * 60 * 1000;
@@ -48,11 +61,16 @@ function renderPage(): string {
   const rows = heartbeats
     .map(({ bot, status, lastSeenTs }) => {
       const restartsToday = restartCountSince(bot.name, dayAgo);
+      const proc = readProcessingState(bot);
+      const activityCell = proc.isProcessing
+        ? `<span class="text-sky-400">⚙️ zpracovává${proc.queueLength > 1 ? ` (+${proc.queueLength - 1} ve frontě)` : ""}</span>${proc.currentJobPreview ? `<div class="text-slate-400 text-xs mt-1">${escapeHtml(proc.currentJobPreview)}</div>` : ""}`
+        : `<span class="text-slate-500">nečinný</span>`;
       return `
         <tr class="border-b border-slate-700">
           <td class="py-2 px-3 font-medium">${bot.name}</td>
           <td class="py-2 px-3 ${STATUS_CLASS[status]}">${STATUS_LABEL[status]}</td>
           <td class="py-2 px-3 text-slate-300">${formatAge(lastSeenTs, now)}</td>
+          <td class="py-2 px-3">${activityCell}</td>
           <td class="py-2 px-3 text-slate-300">${restartsToday}</td>
           <td class="py-2 px-3">
             <form method="POST" action="/restart/${bot.name}" onsubmit="return confirm('Restartovat ${bot.name}? Proces dostane SIGTERM a cron watchdog ho do minuty nahodí zpět.');">
@@ -118,6 +136,7 @@ function renderPage(): string {
         <th class="py-2 px-3">Bot</th>
         <th class="py-2 px-3">Stav</th>
         <th class="py-2 px-3">Poslední heartbeat</th>
+        <th class="py-2 px-3">Právě dělá</th>
         <th class="py-2 px-3">Restartů dnes</th>
         <th class="py-2 px-3"></th>
       </tr>
