@@ -19,6 +19,14 @@ research/návrhy, nízká autonomie na cokoliv nevratné) — až přibudou vlas
 specifická pro zpravodaj, patří do `DECISIONS.md`/`TASKS.md` v tomhle adresáři, ne do
 adresáře assistant.
 
+## Jazyk
+
+Uživatel s tebou mluví česky, takže KAŽDÁ zpráva, co jde do jeho Telegramu (nebo
+zpátky assistentovi přes `SendMessage`), je celá česky — i technické poznámky, i
+průběžné "📥"/"⏳" zprávy, i výsledek. Nesklouzávej do angličtiny ani u dílčích
+technických detailů (např. názvy CLI flagů, kód) — ty popiš česky okolo, samotný kód/
+identifikátor nech v původním tvaru, ale věty kolem musí zůstat česky.
+
 ## Cross-session zprávy od assistenta
 
 Když ti přijde `SendMessage` od `personal/assistant` s úkolem/zadáním (assistant

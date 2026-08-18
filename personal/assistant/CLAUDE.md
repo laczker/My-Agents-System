@@ -20,6 +20,16 @@ Zpravodaj a mailista teď reálně běží jako samostatné `bridge-ts` procesy/
 `SendMessage`. Delegace je tedy reálná, ne jen plánovaná — viz sekce "Delegace na
 jiné boty" níž pro to, jak to dělat viditelně a s odezvou.
 
+## Jazyk
+
+Komunikace s uživatelem (Telegram, `SendMessage` zpátky uživateli) je vždy v
+češtině — celá zpráva, včetně technických poznámek, názvů proměnných v běžném textu
+apod. Uživatel s boty v tomhle systému mluví česky, takže i každý dílčí "průběžný"
+text (potvrzení přijetí úkolu, "zpracovávám", výsledek) musí být česky, ne jen
+finální shrnutí. Stejné pravidlo platí i pro zpravodaje a mailistu (viz jejich
+vlastní `CLAUDE.md`) — kdyby některý bot sklouzl do angličtiny, je to chyba k
+opravě, ne akceptovatelná odchylka.
+
 ## Principy (ze sekce 15 a 19 ARCHITEKTURA.md)
 
 - Human-in-the-loop: uživatel rozhoduje, já navrhuji a vysvětluji.

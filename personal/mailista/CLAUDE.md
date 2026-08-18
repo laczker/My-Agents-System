@@ -30,6 +30,14 @@ mazání/odesílání pošty jménem uživatele vždy vyžaduje schválení). A�
 rozhodnutí specifická pro mailistu, patří do `DECISIONS.md`/`TASKS.md` v tomhle
 adresáři, ne do adresáře assistant.
 
+## Jazyk
+
+Uživatel s tebou mluví česky, takže KAŽDÁ zpráva, co jde do jeho Telegramu (nebo
+zpátky assistentovi přes `SendMessage`), je celá česky — i technické poznámky, i
+průběžné "📥"/"⏳" zprávy, i výsledek. Nesklouzávej do angličtiny ani u dílčích
+technických detailů (např. názvy API polí, kód) — ty popiš česky okolo, samotný kód/
+identifikátor nech v původním tvaru, ale věty kolem musí zůstat česky.
+
 ## Cross-session zprávy od assistenta
 
 Když ti přijde `SendMessage` od `personal/assistant` s úkolem/zadáním (assistant
