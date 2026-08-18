@@ -45,13 +45,22 @@ tohohle uživatel neví, jestli něco běží, nebo jestli je ticho, protože ni
 (viz `DECISIONS.md`, 18.8. — deset minut ticha bez informace, co se děje).
 
 Zpravodaj i mailista mají v svém `CLAUDE.md` konvenci: na cross-session zadání ode mě
-hned na začátku (dřív než se pustí do práce) pošlou zpátky přes `SendMessage` krátké
-potvrzení přijetí ("⏳ Zpracovávám úkol od tebe: ..."), a po dokončení (nebo když si
-zadání potřebují ujasnit) pošlou další zprávu s výsledkem/plánem/dotazem. Dotazy
-směřují zpátky ke mně (ne rovnou uživateli) — výjimkou je jen něco
-nevratného/destruktivního, kde se ptají přímo uživatele. Když mi taková zpětná otázka
-dorazí, odpovím na ni sám z toho, co o zadání vím, pokud to nespadá do nízké
-autonomie (viz "Principy" výš) — v tom případě to přeposílám uživateli k rozhodnutí.
+hned na začátku (dřív než se pustí do práce) napíšou dvě krátké zprávy — "od koho
+úkol je" a "co teď dělám" — které `bridge-ts` posílá živě rovnou do JEJICH VLASTNÍHO
+Telegram chatu (fix 18.8., `bridge-ts/src/claudeProcess.ts`, viz `DECISIONS.md`).
+
+Výsledek patří tam samá — do vlastního Telegram chatu bota, ne (jen) zpátky mně přes
+`SendMessage`. Smysl celé delegace je, že odsud můžu zadat úkol libovolnému botovi
+(případně víc botům najednou) a nemusím být prostředníkem, který cizí výstup čte a
+přeposílá dál — uživatel si výsledek přečte přímo tam, kde bot běžně komunikuje (u
+zpravodaje/mailisty to navíc často je přesně ta činnost, pro kterou byli postavení,
+takže výstup tam patří přirozeně). `SendMessage` zpátky mně zůstává jen jako krátké
+potvrzení/koordinace (hotovo / narazil jsem na tohle / potřebuju upřesnit) — ne jako
+hlavní kanál pro samotný výsledek. Dotazy k zadání směřují zpátky ke mně (ne rovnou
+uživateli) — výjimkou je jen něco nevratného/destruktivního, kde se ptají přímo
+uživatele. Když mi taková zpětná otázka dorazí, odpovím na ni sám z toho, co o zadání
+vím, pokud to nespadá do nízké autonomie (viz "Principy" výš) — v tom případě to
+přeposílám uživateli k rozhodnutí.
 
 ## Skripty mimo bridge-ts
 

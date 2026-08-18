@@ -612,3 +612,55 @@ Alternatives:
 
 Date:
 2026-08-18
+
+## Zjištění: SendMessage adresa může zastarat, odpověď se pak tiše neztratí, ale zpozdí
+
+What:
+Zpravodaj poslal výsledek testu `ai_news_digest.sh` zpátky přes `SendMessage`, ale
+mířil na starou assistant session (`assistant-8e`), která mezitím doběhla/vyměnila
+se za novou — socket byl stale. Zpravodaj si toho všiml (chyba doručení) a poslal
+zprávu znovu, tentokrát na aktuální session — takže výsledek nakonec dorazil, ale
+až po zásahu uživatele ("proč to nic nedalo vědět"), ne hned po dokončení testu.
+Bez toho, že si to zpravodaj sám všiml a zopakoval, by zpráva zůstala nedoručená
+napořád beze stopy (stejný vzorec jako `ai_news_digest.sh` incident — něco selže
+mimo hlavní tok a nikdo se to nedozví).
+
+Why:
+`assistant-*` session ID se mění při cyklení kontextu/restartu, ale bot, co na
+starou adresu odpovídá (zpravodaj), o tom neví — nemá způsob, jak zjistit aktuální
+jméno/ref assistant session jinak než uhodnout nebo si to nechat potvrdit. Tohle
+je architektonická mezera v cross-session komunikaci, ne chyba zpravodaje — udělal
+správnou věc (všiml si a zkusil znovu).
+
+Alternatives:
+Zatím žádná trvalá oprava navržena — nejjednodušší by bylo, aby boti při odpovídání
+používali `ListAgents` a hledali podle jména vzoru (`assistant-*`) nejnovější live
+session, ne uloženou starou referenci z doby přijetí úkolu. Zvážit, až se tenhle
+vzorec zopakuje.
+
+Date:
+2026-08-18
+
+---
+
+## Výsledek delegovaného úkolu patří do vlastního chatu bota, ne jen do SendMessage zpátky
+
+Decision:
+Když deleguji úkol jinému botovi (zpravodaj, mailista) přes `SendMessage`, finální
+výsledek má bot poslat do svého VLASTNÍHO Telegram chatu (stejný mechanismus jako
+"📥 dostal jsem úkol" / "⏳ zpracovávám"), ne jen zpátky mně přes `SendMessage`.
+`SendMessage` zpátky zůstává jen jako krátké potvrzení/koordinace.
+
+Why:
+Uživatel: smysl delegace odsud je zadávat úkoly libovolnému botovi (i víc najednou),
+ne aby se assistant stal povinným prostředníkem, který každý výstup čte a přeposílá
+dál. Když bot dělá přesně to, pro co byl postavený (např. zpravodajův digest),
+výsledek patří tam, kde ho uživatel přirozeně čte — v chatu toho bota.
+
+Alternatives:
+Nechat výsledek jen přes `SendMessage` zpátky assistentovi, který ho pak sám
+přeformuluje/přepošle uživateli — zamítnuto, dělá z assistenta bottleneck a
+neškáluje na víc paralelních delegací.
+
+Date:
+2026-08-18
