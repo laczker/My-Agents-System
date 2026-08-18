@@ -64,4 +64,120 @@ Date:
 2026-08-18
 
 ---
+
+Decision:
+Implementace AI-news skriptu (`ai_news_digest.sh`), samostatně vedle
+`daily_digest.sh`. Model `--model opus` (Opus 5) — uživatel explicitně trval na
+silnějším modelu pro tuhle úlohu, ne defaultní model `claude -p`. Mechanismus:
+hodinový cron s vlastním filtrem hodin (08/12/16/20 Europe/Prague, stejný trik
+jako `daily_digest.sh` kvůli DST), model dostane do promptu seznam už odeslaných
+odkazů (`ai_news_seen.txt`, posledních 300 řádků) a instrukci NEOPAKOVAT stejné
+téma. Pokud nic relevantního nenajde, odpoví přesně `ŽÁDNÉ NOVINKY` a skript nic
+neposílá (event-driven, ne nucený report). Pokud najde, odpoví ve formátu
+`ODKAZY:` blok + report; skript odkazy uloží do seen-listu a zbytek pošle na
+Telegram.
+
+Why:
+Potvrzeno uživatelem přímo v chatu (18.8., + cross-session potvrzení modelu přes
+`assistant-e5`). Frekvence 4x denně je výchozí odhad rovnováhy mezi "dost často na
+to, aby to bylo užitečné" a náklady na opus + web search běh, který se navíc většinu
+běhů stejně nic neodešle — může se dolaďovat podle reálného provozu.
+
+Alternatives:
+1. Vlít AI novinky do stávajícího `daily_digest.sh` (jeden report, jedna sekce) —
+   zamítnuto, uživatel chtěl event-driven rytmus nezávislý na pevném 8:00 slotu.
+2. Defaultní model bez `--model` (jako `daily_digest.sh`) — zamítnuto, uživatel
+   chtěl výslovně silnější model kvůli hloubce researche.
+
+Date:
+2026-08-18
+
+---
+
+Decision:
+Incident: první testovací běh `ai_news_digest.sh` (18.8., 15:11 UTC) spadl
+(`FAIL status=1`), ale skript to jen zalogoval a nikam aktivně nenahlásil —
+protože běží mimo `bridge-ts`/dashboard, nebylo to vidět přes `ListAgents` ani
+frontu, jediná stopa byl vlastní log. Skutečná příčina se zpětně nedala zjistit
+(skript zahazoval stdout/stderr chyby claude příkazu, logoval jen status kód).
+Oprava: (1) `OUTPUT=$(... 2>&1)` místo odděleného přesměrování, aby se text
+chyby při FAIL zalogoval celý; (2) při FAIL skript teď pošle Telegram varování
+(`send_telegram`), ne jen log řádek. Druhý test se stejným zadáním proběhl bez
+chyby (odesláno, 7 nových odkazů, 7393 znaků) — první pád tedy vypadá na
+přechodný problém (např. dočasné přetížení API), ne na chybu v promptu/skriptu,
+ale bez zachyceného textu to nejde s jistotou potvrdit.
+
+Obecné pravidlo z tohohle incidentu (skripty mimo bridge-ts musí při chybě
+aktivně upozornit, ne jen logovat) je teď zapsané i v `CLAUDE.md` (commit
+`e1294ec`, platí napříč assistant/zpravodaj/mailista).
+
+Cron řádek pro `ai_news_digest.sh` zatím záměrně nepřidán — čeká na explicitní
+potvrzení uživatele/assistenta, že oprava + druhý úspěšný test stačí.
+
+Why:
+Bez aktivního upozornění by selhání mimo bridge-ts zůstalo navždy neviditelné —
+přesně tenhle incident to demonstroval (uživatel/assistant si pádu všimli
+nezávisle na tomhle skriptu, ne díky němu).
+
+Alternatives:
+Nechat jen log a spoléhat na to, že si to někdo občas zkontroluje ručně —
+zamítnuto, přesně tohle selhalo.
+
+Date:
+2026-08-18
+
+---
+
+Decision:
+Frekvence `ai_news_digest.sh` změněna z původního návrhu (4x denně: 08/12/16/20)
+na **jednou týdně, pondělí 2:00 Europe/Prague**. Cron přidán (hodinový trigger,
+skript sám pozná pondělí 2:00 stejným DST-safe trikem jako `daily_digest.sh`).
+Zůstává event-driven v tom smyslu, že i v pondělí 2:00 pošle zprávu jen když
+model najde něco relevantního (jinak `ŽÁDNÉ NOVINKY`, tiše).
+
+Why:
+Explicitní pokyn od uživatele (přes cross-session zprávu, 18.8., po ověření že
+oprava chybové signalizace + druhý test fungují) — čtyřikrát denně bylo zjevně
+víc, než uživatel chtěl; týdenní shrnutí na začátek týdne stačí.
+
+Alternatives:
+Ponechat 4x denně — zamítnuto explicitním pokynem uživatele.
+
+Date:
+2026-08-18
+
+---
+
+Decision:
+Webovka na čtení digestů (`webapp/client` + `webapp/server`) hotová a zapojená
+do `watchdog.sh`. Při prvním zapojení jsem udělal chybu: `pgrep` vzor pro
+kontrolu "už běží?" používal relativní cestu (`src/index.ts` po `cd` do
+`webapp/server`), ale spouštěcí příkaz taky předával jen relativní cestu jako
+argument `npx tsx` — takže se v příkazové řádce procesu (vidět přes `ps aux`)
+relativní cesta objevila jen jako `src/index.ts`, ne `webapp/server/src/index.ts`,
+a `pgrep -f "tsx.*webapp/server/src/index.ts"` nikdy nenašel shodu. Výsledek:
+watchdog (cron, každou minutu) spouštěl nový server znovu a znovu, každý další
+pád na `EADDRINUSE` (port 8766 už obsazený tím předchozím) — identická třída
+chyby jako opakované pády `personal/dashboard` zmíněné dřív v tomhle souboru.
+Oprava: stejně jako dashboard blok, `npx tsx` teď dostává absolutní cestu ke
+skriptu jako argument, ne jen `src/index.ts` po `cd` — `pgrep` pak najde shodu
+podle stejného řetězce, co je v příkazové řádce.
+
+Why:
+Obecné pravidlo pro cokoliv přidávané do `watchdog.sh`: `pgrep -f` vzor musí
+odpovídat přesně tomu, co se objeví v `ps aux` u spuštěného procesu — pokud se
+spouští přes `cd dir && npx tsx relativní/cesta.ts`, `pgrep` na tu relativní
+cestu nikdy nesedne, protože grep vidí jen to, co je v argumentech procesu
+(cwd se nezapočítává). Bezpečné je vždy předávat a hledat podle absolutní
+cesty, jak to dělá existující dashboard blok.
+
+Alternatives:
+Hledat podle portu (`lsof -i :8766`) místo `pgrep -f` na cestu skriptu —
+zamítnuto, `lsof` na tomhle hostu není jistě dostupný a `pgrep` na absolutní
+cestu je jednodušší a konzistentní se zbytkem `watchdog.sh`.
+
+Date:
+2026-08-18
+
+---
 </content>

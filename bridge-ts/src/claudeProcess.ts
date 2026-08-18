@@ -30,6 +30,22 @@ export class ClaudeProcess {
   private waiters: Array<(line: string | null) => void> = [];
   private lastContextTokens = 0;
   private cycleRequested = false;
+  // True jen mezi zápisem na stdin v `send()` a jejím vrácením — mimo tenhle
+  // interval nikdo neplive stdout, takže cokoliv přijde, je z tahu, který si
+  // vyžádal někdo jiný než `send()` (viz `handleUnsolicitedLine`).
+  private expectingResponse = false;
+  private unsolicitedText = "";
+
+  /** `bridge-ts` volá `send()` jen pro zprávy z Telegramu. Cross-session zprávy
+   * (`SendMessage` od jiného bota) doručuje runtime přímo do běžícího `claude`
+   * procesu mimo tenhle kanál — proces na ně sám odpoví tahem, jehož JSON eventy
+   * dorazí na STEJNÝ stdout, ale bez aktivního `send()`, co by na ně čekal. Bez
+   * rozlišení by takové řádky skončily v `lineQueue` a příští legitimní `send()`
+   * (pro doopravdy novou zprávu z Telegramu) by je mylně přečetl jako odpověď na
+   * SVOU otázku. Callback pak dostane finální text takového tahu, aby ho bridge
+   * mohl poslat do vlastního Telegram chatu bota — jinak by cross-session úkol
+   * zpracovaný mimo `send()` nebyl v Telegramu vidět vůbec. */
+  constructor(private onUnsolicitedText?: (text: string) => void) {}
 
   /** Součet cache_read + cache_creation + input tokenů z posledního `result`
    * eventu — proxy pro to, kolik "stojí" připomenutí dosavadní historie. */
@@ -75,6 +91,8 @@ export class ClaudeProcess {
     // po pádu, i když nový proces běžel v pořádku.
     this.lineQueue = [];
     this.waiters = [];
+    this.expectingResponse = false;
+    this.unsolicitedText = "";
     this.rl = createInterface({ input: proc.stdout! });
     this.rl.on("line", (line) => {
       if (this.proc === proc) this.onLine(line);
@@ -90,11 +108,48 @@ export class ClaudeProcess {
   }
 
   private onLine(line: string | null): void {
+    if (!this.expectingResponse) {
+      this.handleUnsolicitedLine(line);
+      return;
+    }
     const waiter = this.waiters.shift();
     if (waiter) {
       waiter(line);
     } else if (line !== null) {
       this.lineQueue.push(line);
+    }
+  }
+
+  /** Posílá text z tahu, který nikdo přes `send()` nevyžádal (typicky reakce na
+   * cross-session zprávu), do vlastního Telegram chatu bota — živě, po každém
+   * `assistant` bloku, ne až na `result`. Jeden takový tah může mít víc kroků
+   * (text → nástroj → text → ... → result) a dřívější verze posílala jen ten
+   * poslední kus textu před `result` — mezikroky (např. "dostal jsem úkol od X",
+   * "zpracovávám: ...") tiše zmizely. Dedupe přes `unsolicitedText` brání dvojímu
+   * odeslání stejného textu, když `result.result` jen zopakuje poslední `assistant`
+   * blok. */
+  private handleUnsolicitedLine(line: string | null): void {
+    if (line === null) return;
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let obj: any;
+    try {
+      obj = JSON.parse(trimmed);
+    } catch {
+      return;
+    }
+    if (obj.type === "assistant") {
+      const blocks = obj.message?.content ?? [];
+      const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+      if (text && text !== this.unsolicitedText) {
+        this.unsolicitedText = text;
+        this.onUnsolicitedText?.(text);
+      }
+    }
+    if (obj.type === "result") {
+      const text = obj.result;
+      if (text && text !== this.unsolicitedText) this.onUnsolicitedText?.(text);
+      this.unsolicitedText = "";
     }
   }
 
@@ -130,11 +185,20 @@ export class ClaudeProcess {
    * dílčí text asistenta, pro případ, že proces spadne dřív, než dorazí result. */
   async send(promptText: string, timeoutMs = CLAUDE_TURN_TIMEOUT_MS): Promise<ClaudeResult> {
     if (!this.proc) throw new Error("claude proces není nastartovaný");
+    this.expectingResponse = true;
+    try {
+      return await this.sendAndAwaitResult(promptText, timeoutMs);
+    } finally {
+      this.expectingResponse = false;
+    }
+  }
+
+  private async sendAndAwaitResult(promptText: string, timeoutMs: number): Promise<ClaudeResult> {
     const msg = JSON.stringify({
       type: "user",
       message: { role: "user", content: [{ type: "text", text: promptText }] },
     });
-    this.proc.stdin!.write(msg + "\n");
+    this.proc!.stdin!.write(msg + "\n");
 
     let lastAssistantText = "";
     let structuredResetsAtMs: number | null = null;

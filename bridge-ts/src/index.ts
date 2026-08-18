@@ -86,7 +86,10 @@ async function processQueue(): Promise<void> {
   }
 }
 
-const claudeProcess = new ClaudeProcess();
+// `onUnsolicitedText`: reakce na cross-session zprávu (SendMessage od jiného
+// bota), kterou runtime doručil mimo `send()` — bez tohohle by taková reakce
+// (např. "⏳ Zpracovávám úkol od tebe...") nešla vidět nikde v Telegramu.
+const claudeProcess = new ClaudeProcess((text) => sendMsg(text));
 
 bot.on("message", async (ctx) => {
   if (String(ctx.chat.id) !== String(TELEGRAM_CHAT_ID)) return;
