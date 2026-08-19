@@ -93,7 +93,7 @@ export function renderUsageChart(usage: UsageWindow, sinceTs: number, nowTs: num
       const cy = y(h.cumulative).toFixed(1);
       const when = new Date(h.ts).toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
       const label = `Naražení na limit: ${h.bot} · ${fmtTokens(h.cumulative)} tokenů · ${when}`;
-      return `<g><line x1="${PAD_LEFT}" y1="${cy}" x2="${WIDTH - PAD_RIGHT}" y2="${cy}" stroke="${COLOR_HIT}" stroke-width="1" stroke-dasharray="4 3" />
+      return `<g><line x1="${PAD_LEFT}" y1="${cy}" x2="${WIDTH - PAD_RIGHT}" y2="${cy}" stroke="${COLOR_HIT}" stroke-width="0.5" stroke-dasharray="4 3" opacity="0.6" />
       <circle cx="${cx}" cy="${cy}" r="12" fill="transparent"><title>${label}</title></circle>
       <circle cx="${cx}" cy="${cy}" r="3.5" fill="${COLOR_HIT}" stroke="${COLOR_SURFACE_RING}" stroke-width="1.5" /></g>`;
     })
