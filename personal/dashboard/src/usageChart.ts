@@ -83,17 +83,19 @@ export function renderUsageChart(usage: UsageWindow, sinceTs: number, nowTs: num
     })
     .join("");
 
-  // Tenká vodorovná čárka přímo v bodě naražení na limit (na kumulativní
-  // hodnotě), ne svislice přes celý graf — čára "v tom bodě", ne přes celý
-  // časový rozsah.
+  // Tenká vodorovná čára přes celou šířku grafu ve výšce naražení na limit —
+  // funguje jako prahová referenční čára, na kterou je vidět i pozdější body
+  // grafu (ne jen krátká čárka u samotného bodu), plus tečka v místě události
+  // pro tooltip s detailem.
   const hitMarkers = usage.hits
     .map((h) => {
       const cx = Number(x(h.ts).toFixed(1));
       const cy = y(h.cumulative).toFixed(1);
       const when = new Date(h.ts).toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
       const label = `Naražení na limit: ${h.bot} · ${fmtTokens(h.cumulative)} tokenů · ${when}`;
-      return `<g><circle cx="${cx}" cy="${cy}" r="12" fill="transparent"><title>${label}</title></circle>
-      <line x1="${(cx - 8).toFixed(1)}" y1="${cy}" x2="${(cx + 8).toFixed(1)}" y2="${cy}" stroke="${COLOR_HIT}" stroke-width="2.5" stroke-linecap="round" /></g>`;
+      return `<g><line x1="${PAD_LEFT}" y1="${cy}" x2="${WIDTH - PAD_RIGHT}" y2="${cy}" stroke="${COLOR_HIT}" stroke-width="1" stroke-dasharray="4 3" />
+      <circle cx="${cx}" cy="${cy}" r="12" fill="transparent"><title>${label}</title></circle>
+      <circle cx="${cx}" cy="${cy}" r="3.5" fill="${COLOR_HIT}" stroke="${COLOR_SURFACE_RING}" stroke-width="1.5" /></g>`;
     })
     .join("");
 
