@@ -7,10 +7,39 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-(momentálně nic)
+- **Mailista: 4 vlákna od fakturace@endora.cz (prosinec 2020)** — 2 zálohové
+  listy + 2 upomínky k nim ("1. upomínka k zálohovému listu"), var. symboly
+  20485915 a 20485379. Skoro 6 let stará upomínka k platbě, pravděpodobně
+  dávno vyřešená, ale je to finanční věc (nízká autonomie), takže mailista
+  čeká na tvoje rozhodnutí smazat/archivovat/nechat. Vlákna zatím netknutá,
+  mailista pokračuje v ostatních dávkách dál.
 
 ## Rozpracováno
 
+- **Noční dojetí (18.8. večer, uživatel jde spát)** — zadáno oběma botům přes
+  `SendMessage`, běží dynamický self-pace loop (assistant), co je bude
+  periodicky pobízet a hlídat: (1) **mailista** pokračuje v chronologickém
+  čištění nepřečtených vláken (viz jeho `chat_history.txt`) dávka po dávce,
+  cíl dostat se výrazně dál, orientačně k roku 2025; assistant ho pobízí dál,
+  když ztichne, a řeší nejasné případy, co mu mailista pošle zpět. (2)
+  **zpravodaj** má přes noc zůstat v klidu (žádný build/dev server kvůli OOM
+  riziku na 3.7GB RAM stroji, viz dnešní pád), jen počkat na ranní 8:00 cron
+  a nahlásit do vlastního Telegramu, jestli řetězec digest→webovka→Telegram
+  s odkazem opravdu fungoval mimo ruční test. Webapp mezitím commitnutý a
+  pushnutý (`26cb247`). **Upřesnění (zpravodaj-19, 23:5x):** zpravodaj se sám
+  v 8:00 nevzbudí (žádný nástroj na probuzení přes hodinu dopředu) — assistant
+  ho musí po 8:00 pražského času sám šťouchnout přes `SendMessage` (součást
+  téhož self-pace loopu, co pobízí mailistu), teprve pak zpravodaj zkontroluje
+  `digest_log.txt`/webovku a nahlásí výsledek. `daily_digest.sh` má vlastní
+  aktivní alert při tvrdém selhání bez ohledu na tohle šťouchnutí. Smazat
+  tuhle položku, až ráno oba přehledy dorazí a nic nebude viset.
+- **Přidělování modelů jednotlivým agentům/botům — nevyřešeno** (19.8.) — nemáme
+  žádné pravidlo/framework, podle čeho se u nového bota nebo subagenta rozhoduje
+  model (haiku/sonnet/opus). Zatím to bylo ad-hoc (Ludwigův vzor: statický `--model`
+  flag v configu bota). Týká se to přímo rozhodnutí u research agenta níž, ale i
+  všech nově navržených botů (finanční poradce, učitel angličtiny, programátor) —
+  před založením dalšího bota by tohle mělo mít aspoň základní pravidlo, ne se řešit
+  bot od bota znovu.
 - **Google/research agent (deep research)** — zjištěno (18.8., subagent prohledal
   `/tmp/Agent2Telegram`, ne `/tmp/AgentsMonitoring` — to je jen supervisor bez
   research/model logiky): Ludwigův bridge nemá žádný vlastní deep-research vzor,
@@ -36,6 +65,21 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 - **Infra-review agent** — občas projde systém a navrhne vylepšení, může reagovat
   na AI-novinky agenta/zpravodaje. Založit až jako druhý/třetí specialista, ne první.
+- **Programátor bot** (nápad 19.8.) — dedikovaný bot na vývoj/údržbu SW v tomhle
+  systému (např. webovky jako u zpravodaje), který zná tech stack a konvence
+  projektu (viz "web-stack-preference" v paměti: JS/TS, Node, React, bez Cypress).
+  Důvod: včerejší webapp úkol nechaný na zpravodajovi (který k tomu není určený)
+  vedl k OOM pádu; dedikovaný bot by měl nižší spotřebu tokenů (nemusí si dokola
+  domýšlet kontext projektu) a jasnější odpovědnost.
+- **Šablona/podsystém pro jednotlivé SW projekty** (nápad 19.8.) — obecná šablona,
+  kterou by "programátor bot" (nebo budoucí meta-bot) použil při zakládání nového
+  dílčího bota/podsystému na konkrétní SW projekt — souvisí s "Agent na zakládání
+  agentů" níž, ale je užší (jen pro SW projekty, ne libovolný bot).
+- **Finanční poradce bot** (nápad 19.8.) — zatím jen název nápadu, náplň/rozsah
+  nedomluvený. Pozor: cokoliv s penězi je podle "Principy" nízká autonomie, bude
+  vyžadovat explicitní schválení u konkrétních akcí, ne jen u založení.
+- **Učitel angličtiny bot** (nápad 19.8.) — zatím jen název nápadu, náplň/rozsah
+  nedomluvený.
 
 ## Hotovo
 

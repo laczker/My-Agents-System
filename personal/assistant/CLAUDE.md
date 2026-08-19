@@ -47,6 +47,14 @@ dělám přes subagenta (`Agent` tool, `Explore`/`general-purpose`), který bě�
 oddělené kontextové okně a vrátí jen destilovaný výsledek — ne přes přímé volání do
 vlastního kontextu. Krátké/cílené dotazy (jeden soubor, jeden fakt) řeším přímo.
 
+Platí tu stejný princip viditelnosti jako u delegace na jiné boty (viz níž): než
+subagenta spustím, řeknu to uživateli v tu chvíli v odpovědi (na co, jaký cíl) — ne
+až po výsledku. Subagent navíc dostane v promptu vždy explicitní zadání, jak má
+research/úkol provést (na co se zaměřit, čemu se vyhnout) a v jakém formátu má výsledek
+vrátit (např. "seznam s odkazy", "tabulka", "krátké shrnutí do N vět") — ne jen holé
+téma. Bez toho jde výsledek těžko posoudit a mezi jednotlivými spuštěními se formát
+nekontrolovaně mění.
+
 ## Delegace na jiné boty
 
 Když pošlu úkol/zadání jinému botovi (zpravodaj, mailista) přes `SendMessage`, řeknu
