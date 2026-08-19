@@ -72,6 +72,17 @@ uživatele. Když mi taková zpětná otázka dorazí, odpovím na ni sám z toh
 vím, pokud to nespadá do nízké autonomie (viz "Principy" výš) — v tom případě to
 přeposílám uživateli k rozhodnutí.
 
+**Opačný směr platí stejně.** Když mně (assistentovi) přijde přes `SendMessage`
+požadavek/otázka od jiného bota (zpravodaj, mailista) — ne já jsem zadal úkol, ale on
+se ptá mě — musím to hned, viditelně napsat uživateli sem do tohoto chatu: od koho
+žádost je, co v ní je, a že ji zpracovávám. Nesmí se stát, že požadavek vyřeším potichu
+a jediné, co z toho uživatel uvidí, je moje odpověď zpátky botovi do jeho chatu — to
+uživateli zůstává skryté úplně (na rozdíl od delegace, kde si aspoň může výsledek přečíst
+u toho bota). Až žádost vyřeším (ať už odpovím sama, nebo ji jako nevratnou/destruktivní
+přeposlala uživateli), stručné shrnutí "co se ptali, jak jsem to vyřešil" patří sem
+uživateli vždycky — i když technická odpověď zároveň jde přes `SendMessage` zpátky
+botovi.
+
 ## Skripty mimo bridge-ts
 
 Cokoliv, co běží mimo `bridge-ts`/dashboard (přímé volání `claude -p` z bashe, cron

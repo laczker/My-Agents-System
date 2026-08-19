@@ -664,3 +664,24 @@ neškáluje na víc paralelních delegací.
 
 Date:
 2026-08-18
+
+## Viditelnost platí i obráceně — příchozí požadavky od jiných botů na assistenta
+
+Decision:
+Když jinému botovi (zpravodaj, mailista) zadám úkol, musím to uživateli hned říct a
+výsledek patří do vlastního chatu bota — to už bylo zavedené 18.8. Chybělo ale
+zrcadlové pravidlo pro opačný směr: když naopak jiný bot pošle přes `SendMessage`
+požadavek/otázku MNĚ (assistentovi), musím i tohle hned viditelně napsat uživateli do
+JEHO chatu (od koho žádost je, co v ní je, že ji zpracovávám) a po vyřešení sem poslat
+stručné shrnutí — ne to vyřešit potichu a odpovědět jen zpátky botovi do jeho chatu.
+Doplněno do `CLAUDE.md`, sekce "Delegace na jiné boty".
+
+Why:
+Uživatel: "Když ti on posílal požadavek nic nevypsal ani jsem nevěděl že něco děláš a
+hlavně jsi to vypsal jemu a ne sem." U odchozí delegace si uživatel aspoň může přečíst
+výsledek u druhého bota. U příchozího požadavku od bota na assistenta ale žádný takový
+záložní kanál není — pokud assistent odpoví jen zpátky botovi, uživatel se o té výměně
+nedozví vůbec, ani zpětně.
+
+Date:
+2026-08-19
