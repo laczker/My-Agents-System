@@ -16,6 +16,38 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("cs-CZ", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function labelForType(type: DigestType): string {
+  return TABS.find((t) => t.type === type)?.label ?? type;
+}
+
+const URL_RE = /(https?:\/\/\S+)/g;
+
+function linkify(text: string) {
+  return text.split(URL_RE).map((part, i) =>
+    part.startsWith("http") ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer">
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
+
+function renderBody(text: string) {
+  return text
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line, i) => {
+      const isBullet = line.startsWith("• ");
+      return (
+        <p key={i} className={isBullet ? "bullet" : "section-heading"}>
+          {isBullet ? linkify(line.slice(2)) : line}
+        </p>
+      );
+    });
+}
+
 function DigestDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [digest, setDigest] = useState<Digest | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +68,10 @@ function DigestDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {digest && (
         <>
           <h1>{digest.title}</h1>
-          <p className="meta">{formatDate(digest.createdAt)}</p>
-          <pre className="body">{digest.body}</pre>
+          <p className="meta">
+            {labelForType(digest.type)} · {formatDate(digest.createdAt)}
+          </p>
+          <div className="body">{renderBody(digest.body)}</div>
         </>
       )}
     </div>

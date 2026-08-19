@@ -79,6 +79,9 @@ $(if [ -n "$SEEN_CONTENT" ]; then echo "$SEEN_CONTENT"; else echo "(zatím nic)"
 4. Pokud něco relevantního najdeš, odpověz v tomhle přesném formátu (žádný
    markdown, jde přímo do webové archivace a do Telegramu):
 
+TITULEK: <krátký věcný titulek (cca 4-8 slov) hlavního nálezu/nálezů - klidně
+víc témat oddělených čárkou, pokud jsou rovnocenná. ŽÁDNÝ clickbait.>
+
 ODKAZY:
 <jeden odkaz na řádek, jen ty které v reportu skutečně používáš>
 
@@ -108,17 +111,17 @@ if [ -z "$TRIMMED" ] || [ "$TRIMMED" = "$NO_NEWS_MARK" ]; then
   exit 0
 fi
 
+TITLE=$(echo "$OUTPUT" | awk '/^TITULEK:/{sub(/^TITULEK: */,""); print; exit}')
 LINKS=$(echo "$OUTPUT" | awk '/^ODKAZY:/{f=1;next} f&&/^$/{exit} f')
 TEASER=$(echo "$OUTPUT" | awk '/^TEASER:/{sub(/^TEASER: */,""); print; exit}')
-BODY=$(echo "$OUTPUT" | awk 'BEGIN{f=0} /^TEASER:/{next} f==0&&/^$/{f=1;next} f{print}')
+BODY=$(echo "$OUTPUT" | awk 'BEGIN{seen=0;f=0} /^TEASER:/{seen=1;next} seen&&f==0&&/^$/{f=1;next} f{print}')
 
 if [ -z "$BODY" ]; then
   # model neposlal očekávaný formát - pošli rovnou celý výstup, ať se neztratí
   BODY="$OUTPUT"
 fi
 [ -z "$TEASER" ] && TEASER="Nové AI novinky jsou k dispozici."
-
-TITLE="AI novinky – $(TZ='Europe/Prague' date +%d.%m.%Y)"
+[ -z "$TITLE" ] && TITLE="AI novinky – $(TZ='Europe/Prague' date +%d.%m.%Y)"
 TEASER_FILE=$(mktemp)
 BODY_FILE=$(mktemp)
 printf '%s' "$TEASER" >"$TEASER_FILE"

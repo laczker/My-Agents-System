@@ -1,0 +1,3 @@
+2026-08-19T06:00:01Z Start
+  telegram HTTP 200
+2026-08-19T06:01:56Z OK, délka výstupu: 2865 znaků

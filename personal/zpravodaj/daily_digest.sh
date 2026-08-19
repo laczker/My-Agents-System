@@ -43,12 +43,17 @@ send_telegram() {
 PROMPT=$(cat <<'EOF'
 Sestav dnešní ranní zpravodaj. Postupuj takto:
 
-0. Na úplně první řádek napiš "SHRNUTÍ: " + JEDNU větu shrnující dnešní
+0. Na úplně první řádek napiš "TITULEK: " + krátký věcný titulek (cca 4-8 slov)
+   shrnující hlavní téma/témata dneška - klidně víc témat oddělených čárkou,
+   pokud jsou rovnocenná. ŽÁDNÝ clickbait (žádné "Šokující", "Nebudete věřit",
+   otazníky navíc apod.) - jen věcně o čem dnešní zpravodaj je.
+
+1. Na druhý řádek napiš "SHRNUTÍ: " + JEDNU větu shrnující dnešní
    nejdůležitější témata napříč Českem i světem (jde do Telegram zprávy místo
    celého textu, s odkazem na plné znění). Pak jeden prázdný řádek. Teprve pak
    pokračuj samotným zpravodajem podle bodů níž.
 
-1. Stáhni obsah těchto RSS feedů:
+2. Stáhni obsah těchto RSS feedů:
    - Alarm: https://denikalarm.cz/feed/ (pozor, bez koncového lomítka dělá redirect)
    - Deník N Česko: https://denikn.cz/cesko/feed
    - Deník N Svět: https://denikn.cz/svet/feed
@@ -56,22 +61,23 @@ Sestav dnešní ranní zpravodaj. Postupuj takto:
    - Novinky.cz: https://www.novinky.cz/rss
    - Seznam Zprávy: https://www.seznamzpravy.cz/rss
 
-2. Z každého feedu vezmi jen položky publikované za posledních 24 hodin (podle <pubDate>).
+3. Z každého feedu vezmi jen položky publikované za posledních 24 hodin (podle <pubDate>).
 
-3. Vyber celkem cca 6-8 nejdůležitějších/nejzajímavějších položek. Rozděl je do
+4. Vyber celkem cca 6-8 nejdůležitějších/nejzajímavějších položek. Rozděl je do
    dvou sekcí podle tématu (ne podle zdroje): Česko a Svět.
 
-4. Ke každé položce napiš JEDNU větu shrnutí - POUZE na základě skutečně staženého
+5. Ke každé položce napiš JEDNU větu shrnutí - POUZE na základě skutečně staženého
    title/description z feedu. Nic si nedomýšlej ani nedopisuj nad rámec staženého textu.
 
-5. Za každou položku připoj přímý odkaz (<link> z feedu).
+6. Za každou položku připoj přímý odkaz (<link> z feedu).
 
-6. Pokud u některého zdroje za posledních 24 hodin nic relevantního není, zdroj v
+7. Pokud u některého zdroje za posledních 24 hodin nic relevantního není, zdroj v
    přehledu prostě vynech (nepiš, že nic nenašel).
 
 Formát výstupu - DŮLEŽITÉ, jde přímo do webové archivace beze změny:
 - Prostý text, ŽÁDNÝ markdown (žádné **, #, --- apod.)
-- Úplně první řádek: "SHRNUTÍ: ..." podle bodu 0. Pak prázdný řádek.
+- Úplně první řádek: "TITULEK: ..." podle bodu 0. Druhý řádek: "SHRNUTÍ: ..."
+  podle bodu 1. Pak prázdný řádek.
 - Pak samotný zpravodaj: první řádek dnešní datum, sekce "Česko" a "Svět",
   odrážky jako "• ".
 - Vrať jako finální odpověď POUZE tohle - žádný úvod, žádné vysvětlování,
@@ -89,12 +95,12 @@ if [ $STATUS -ne 0 ] || [ -z "$OUTPUT" ]; then
   exit 1
 fi
 
+TITLE=$(echo "$OUTPUT" | awk '/^TITULEK:/{sub(/^TITULEK: */,""); print; exit}')
 TEASER=$(echo "$OUTPUT" | awk '/^SHRNUTÍ:/{sub(/^SHRNUTÍ: */,""); print; exit}')
-BODY=$(echo "$OUTPUT" | awk 'BEGIN{f=0} /^SHRNUTÍ:/{next} f==0&&/^$/{f=1;next} f{print}')
+BODY=$(echo "$OUTPUT" | awk 'BEGIN{f=0} /^TITULEK:/{next} /^SHRNUTÍ:/{next} f==0&&/^$/{f=1;next} f{print}')
 [ -z "$BODY" ] && BODY="$OUTPUT"
 [ -z "$TEASER" ] && TEASER="Dnešní ranní zpravodaj je hotový."
-
-TITLE="Ranní zpravodaj – $(TZ='Europe/Prague' date +%d.%m.%Y)"
+[ -z "$TITLE" ] && TITLE="Ranní zpravodaj – $(TZ='Europe/Prague' date +%d.%m.%Y)"
 TEASER_FILE=$(mktemp)
 BODY_FILE=$(mktemp)
 printf '%s' "$TEASER" >"$TEASER_FILE"
