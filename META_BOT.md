@@ -72,7 +72,8 @@ povinný — bez něj uživatel o výměně vůbec neví, protože nemá příst
 
 Každý bot = vlastní adresář `personal/<jméno>/`:
 - `bridge-ts` proces spuštěný s profilem daného bota, `cwd` = tenhle adresář
-- vlastní Telegram token v `/home/agent/agent-system/.env.<jméno>`
+- vlastní Telegram token v `/home/agent/agent-system/.env.<jméno>`, tamtéž volitelně
+  `CLAUDE_MODEL` (viz §2a) — bez něj default `sonnet`
 - `CLAUDE.md` — trvalé instrukce, načte se automaticky při každém tahu (viz §3,
   všechny konvence musí být TADY, ne jen v hlavě zakladatele)
 - `DECISIONS.md` — technická/architektonická rozhodnutí specifická pro bota, formát
@@ -83,6 +84,26 @@ Každý bot = vlastní adresář `personal/<jméno>/`:
   vytváří/udržuje `bridge-ts` sám
 - záznam v `watchdog.sh` (host-level cron skript, mimo `personal/`) — bez něj bota
   nikdo nenahodí po pádu
+
+## 2a. Přiřazování modelu botovi/subagentovi
+
+Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
+`CLAUDE_MODEL` z `.env.<jméno>`, default `sonnet`) — žádné dynamické přepínání
+podle úkolu uvnitř jednoho bota, stejný vzor, jaký používá Ludwigův bridge.
+Pravidlo pro volbu při zakládání bota:
+- **`sonnet` (default)** — běžný bot s průběžnou konverzací/rozhodováním
+  (assistant, zpravodaj, mailista, budoucí programátor/finanční/jazykový bot).
+  Neměnit bez konkrétního důvodu (kvalita rozhodování u citlivých úkolů, např.
+  mailista maže/archivuje maily, jde o data).
+- **`opus`** — jen tam, kde jde primárně o hloubku/kvalitu jednorázového
+  výstupu, ne o levný objem (např. dedikovaný deep-research bot).
+- **`haiku`** — zvážit jen u vysokoobjemové, nízkorizikové, opakovatelné
+  klasifikace (ne u rozhodnutí, která se těžko vrací zpět). Přepnutí existujícího
+  bota na `haiku` kvůli úspoře tokenů je změna chování/kvality, ne jen infra —
+  potvrdit s uživatelem předem, nepřepínat automaticky.
+- Subagenti spuštění přes `Agent` tool (uvnitř jednoho bota) mají svůj vlastní
+  `model` parametr na úrovni jednoho volání — to je nezávislé na `CLAUDE_MODEL`
+  bota a řeší se výběrem modelu pro konkrétní subagentní úkol, ne globálně.
 
 ## 3. Konvence, které musí mít KAŽDÝ nový bot v `CLAUDE.md` (vynucené incidenty, ne teorie)
 

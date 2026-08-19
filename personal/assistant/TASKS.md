@@ -33,13 +33,13 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   `digest_log.txt`/webovku a nahlásí výsledek. `daily_digest.sh` má vlastní
   aktivní alert při tvrdém selhání bez ohledu na tohle šťouchnutí. Smazat
   tuhle položku, až ráno oba přehledy dorazí a nic nebude viset.
-- **Přidělování modelů jednotlivým agentům/botům — nevyřešeno** (19.8.) — nemáme
-  žádné pravidlo/framework, podle čeho se u nového bota nebo subagenta rozhoduje
-  model (haiku/sonnet/opus). Zatím to bylo ad-hoc (Ludwigův vzor: statický `--model`
-  flag v configu bota). Týká se to přímo rozhodnutí u research agenta níž, ale i
-  všech nově navržených botů (finanční poradce, učitel angličtiny, programátor) —
-  před založením dalšího bota by tohle mělo mít aspoň základní pravidlo, ne se řešit
-  bot od bota znovu.
+- **Přidělování modelů jednotlivým agentům/botům — mechanismus hotový** (19.8.) —
+  `bridge-ts` teď čte `CLAUDE_MODEL` z `.env.<profil>` a posílá ho jako statický
+  `--model` flag (default `sonnet`, žádná změna chování u žádného ze 3 běžících
+  botů). Pravidlo pro volbu při zakládání dalšího bota je v `META_BOT.md` §2a.
+  Commitnuto a boty restartované, ať je flag reálně aktivní. Otevřené zůstává jen
+  konkrétní rozhodnutí u research agenta (opus, čeká na uživatele níž) — jinak nic
+  neblokuje.
 - **Google/research agent (deep research)** — zjištěno (18.8., subagent prohledal
   `/tmp/Agent2Telegram`, ne `/tmp/AgentsMonitoring` — to je jen supervisor bez
   research/model logiky): Ludwigův bridge nemá žádný vlastní deep-research vzor,

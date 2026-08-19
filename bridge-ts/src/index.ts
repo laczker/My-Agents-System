@@ -70,7 +70,18 @@ async function processQueue(): Promise<void> {
   try {
     while (jobQueue.length > 0) {
       const job = jobQueue[0];
-      const outcome = await runClaude(claudeProcess, job.userText, job.downloadedFileInfo);
+      let outcome: Awaited<ReturnType<typeof runClaude>>;
+      try {
+        outcome = await runClaude(claudeProcess, job.userText, job.downloadedFileInfo);
+      } catch (e) {
+        // Dřív tohle skončilo jako unhandledRejection z `void processQueue()` — jen
+        // se to zalogovalo, uživatel se to nedozvěděl a rozpracovaný výsledek (viz
+        // `neodpověděl včas (částečný text: ...)`) zmizel beze stopy. Job zůstává na
+        // začátku fronty (neshiftnutý), takže se zkusí znovu při další zprávě.
+        const msg = e instanceof Error ? e.message : String(e);
+        sendMsg(`⚠️ Tah selhal (${msg}). Úkol zůstává ve frontě, zkusím to znovu při další zprávě.`);
+        return;
+      }
       if (outcome.kind === "rate_limited") {
         enterRateLimitWait(outcome.resetsAtMs);
         return;

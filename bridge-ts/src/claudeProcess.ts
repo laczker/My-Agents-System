@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { openSync } from "node:fs";
-import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS } from "./config.js";
+import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS, CLAUDE_MODEL } from "./config.js";
 import { getSessionId, saveSessionId } from "./session.js";
 import { getHistory } from "./history.js";
 import { looksLikeRateLimitText, parseResetsAtFromText, normalizeResetsAt } from "./rateLimit.js";
@@ -73,6 +73,7 @@ export class ClaudeProcess {
       "--verbose",
       "--dangerously-skip-permissions",
       "--autocompact", "auto",
+      "--model", CLAUDE_MODEL,
     ];
     if (resumeSessionId) args.push("--resume", resumeSessionId);
 

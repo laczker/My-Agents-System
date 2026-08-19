@@ -32,6 +32,12 @@ export const OUTBOX_FILE = `${BOT_DIR}/outbox_ts.json`;
 export const QUEUE_FILE = `${BOT_DIR}/job_queue_ts.json`;
 export const TURN_LOG_FILE = `${BOT_DIR}/turn_log_ts.jsonl`;
 
+// Statický model per bot (Ludwigův vzor — žádné dynamické přepínání podle úkolu,
+// jen pevná hodnota v `.env.<profil>`). Bez `CLAUDE_MODEL` v env souboru default
+// "sonnet" — odpovídá dosavadnímu chování (CLI default), takže přidání tohohle
+// přepínače samo o sobě nic nemění, dokud ho někdo u konkrétního bota nepřepíše.
+export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "sonnet";
+
 export const CLAUDE_CWD = BOT_DIR;
 export const STDERR_LOG = profile
   ? `/home/agent/agent-system/bridge_ts_${profile}_claude_stderr.log`
@@ -41,7 +47,10 @@ export const STARTUP_MESSAGE =
   process.env.STARTUP_MESSAGE ?? "🚀 AI Centrální Správce je aktivní (TS/grammY build, testováno)!";
 
 export const HISTORY_EXCHANGES = 10;
-export const CLAUDE_TURN_TIMEOUT_MS = 280_000;
+// Dřív 280_000 (4:40) — moc krátké na dlouhé dávky (např. mailista zpracovávající
+// desítky vláken v jednom tahu), timeout tah zabil uprostřed práce a výsledek se
+// ztratil (viz DECISIONS.md, zjištění 19.8.).
+export const CLAUDE_TURN_TIMEOUT_MS = 900_000;
 export const HEARTBEAT_INTERVAL_MS = 15_000;
 export const OUTBOX_RETRY_INTERVAL_MS = 10_000;
 
