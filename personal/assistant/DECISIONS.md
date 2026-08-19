@@ -685,3 +685,33 @@ nedozví vůbec, ani zpětně.
 
 Date:
 2026-08-19
+
+---
+
+## `META_BOT.md`: konsolidovaný zápis architektury + konvencí pro budoucího meta-bota
+
+Decision:
+Nový soubor `/home/agent/agent-system/META_BOT.md` (top-level, ne v `personal/`)
+shrnuje, jak systém multi-bot delegace reálně funguje (diagram procesů + delegační
+protokol), strukturu jednoho bota jako šablonu pro založení dalšího, čtyři vynucené
+konvence (jazyk, delegační protokol, alerting skriptů mimo `bridge-ts`, nízká
+autonomie), sdílené vs. izolované zdroje mezi boty (včetně 3.7GB RAM limitu stroje) a
+odkaz na dřív zapsané otevřené otázky (§17.8. výše). `ARCHITEKTURA.md` sekce 10
+(Orchestrator) teď na něj odkazuje.
+
+Why:
+Uživatel chtěl obrázek/diagram, jak systém funguje, a explicitně požádal, ať se tyhle
+věci zapíšou, aby je znal budoucí "bot na vytváření botů" — ne aby zůstaly rozeseté
+po `DECISIONS.md` tří různých botů a musely se znovu dolovat z historie incidentů.
+Umístění mimo `personal/assistant/` proto, že jde o znalost napříč celým systémem
+(všechny tři boty), ne assistant-specifickou.
+
+Alternatives:
+1. Nechat to jen v `DECISIONS.md` jednotlivých botů — zamítnuto, přesně tohle uživatel
+   označil za problém (roztroušené, nikdo to celé nepřečte).
+2. Rozšířit `ARCHITEKTURA.md` přímo — zamítnuto, je to uživatelův vlastní původní
+   plánovací dokument v jiném stylu (krátké body, vize), míchání s provozní realitou
+   by ho znečitelnilo; místo toho jen krátký odkaz.
+
+Date:
+2026-08-19

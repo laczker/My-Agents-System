@@ -44,6 +44,14 @@ Agenti nemají mít automaticky přístup ke všemu.
 ## 10. Orchestrator
 Přijme task, vybere agenta, předá context, sleduje stav.
 
+Reálný stav (2026-08-19): žádný orchestrátor v tomhle smyslu zatím neběží — delegace
+dnes dělá Assistant sám přes `SendMessage` mezi třemi samostatnými `bridge-ts`
+procesy (assistant, zpravodaj, mailista). Jak to skutečně funguje a jaké konvence
+si to vynutilo (delegační protokol, jazyk, alerting, sdílené vs. izolované zdroje) je
+zapsané v `META_BOT.md` — určeno jako startovní bod pro budoucího meta-bota (bota,
+co bude sám zakládat/spouštět další boty), ať neobjevuje stejná pravidla znovu přes
+stejné incidenty.
+
 ## 11. Paralelní práce
 Maximalizovat užitečný výstup na jednotku času.
 
