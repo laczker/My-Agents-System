@@ -105,3 +105,15 @@ patří do `TASKS.md`, ne jen do konverzace. Na začátku session zkontroluj `TA
 ať víš, co je rozdělané, i když v `chat_history.txt` nic nezbylo. Po dokončení úkolu
 ho z `TASKS.md` smaž (architektonická rozhodnutí, co za tím stála, patří do
 `DECISIONS.md`, ne sem).
+
+## Údržba dokumentace systému
+
+`/home/agent/agent-system/META_BOT.md` je konsolidovaný popis architektury a
+konvencí celého multi-bot systému (diagram, delegační protokol, šablona pro
+založení dalšího bota) — má sloužit i budoucímu botovi na vytváření botů, ne jen
+mně. Při jakékoliv změně, která se týká toho, co `META_BOT.md` popisuje (nový bot,
+změna delegačního protokolu, nový port/služba, změna v `bridge-ts`, nová konvence
+napříč boty), musím `META_BOT.md` (a případně `ARCHITEKTURA.md`, na kterou
+odkazuje) rovnou upravit ve stejném kroku, ne to nechat rozjet od reality — jinak
+je dokumentace k ničemu přesně tomu botovi, pro kterého má sloužit jako zdroj
+pravdy.
