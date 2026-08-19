@@ -48,6 +48,13 @@ export interface UsagePoint {
   cumulative: number;
 }
 
+export interface TurnPoint {
+  ts: number;
+  bot: string;
+  cumulative: number;
+  newTokens: number;
+}
+
 export interface BurnPoint {
   ts: number;
   bot: string;
@@ -57,25 +64,30 @@ export interface BurnPoint {
 
 export interface UsageWindow {
   series: UsagePoint[];
+  turns: TurnPoint[];
   hits: BurnPoint[];
+  /** Aktuální kumulativní součet na konci okna (poslední bod `series`) — pro stat number. */
+  total: number;
 }
 
 /** Kumulativní součet `newTokens` napříč boty od `sinceTs`, s resetem na 0 při
  * každém naražení na limit (`rateLimited: true`) — tím vznikne "pilovitý" průběh:
  * roste, dokud se kvóta nevyčerpá, pak spadne zpátky na nulu. */
 export function buildUsageWindow(bots: BotDef[], sinceTs: number): UsageWindow {
-  const turns = bots
+  const rawTurns = bots
     .flatMap(readTurns)
     .filter((t) => t.ts >= sinceTs)
     .sort((a, b) => a.ts - b.ts);
 
   const series: UsagePoint[] = [{ ts: sinceTs, cumulative: 0 }];
+  const turns: TurnPoint[] = [];
   const hits: BurnPoint[] = [];
   let cumulative = 0;
 
-  for (const t of turns) {
+  for (const t of rawTurns) {
     cumulative += t.newTokens;
     series.push({ ts: t.ts, cumulative });
+    turns.push({ ts: t.ts, bot: t.bot, cumulative, newTokens: t.newTokens });
     if (t.rateLimited) {
       hits.push({ ts: t.ts, bot: t.bot, cumulative, resetsAtMs: t.resetsAtMs });
       cumulative = 0;
@@ -83,5 +95,5 @@ export function buildUsageWindow(bots: BotDef[], sinceTs: number): UsageWindow {
     }
   }
 
-  return { series, hits };
+  return { series, turns, hits, total: cumulative };
 }

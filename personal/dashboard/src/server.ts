@@ -38,6 +38,14 @@ function fmtTokens(n: number): string {
   return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n));
 }
 
+const RANGE_PRESETS: Record<string, { label: string; ms: number }> = {
+  "1d": { label: "24 hodin", ms: 24 * 60 * 60 * 1000 },
+  "3d": { label: "3 dny", ms: 3 * 24 * 60 * 60 * 1000 },
+  "7d": { label: "7 dní", ms: 7 * 24 * 60 * 60 * 1000 },
+  "14d": { label: "14 dní", ms: 14 * 24 * 60 * 60 * 1000 },
+};
+const DEFAULT_RANGE = "3d";
+
 // Fronta obsahuje surový uživatelský text (Telegram zpráva) — escapovat před
 // vložením do HTML, ať si uživatel/útočník nemůže poslat zprávu, co si vloží
 // vlastní markup do dashboardu.
@@ -50,13 +58,15 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function renderPage(): string {
+function renderPage(range: string): string {
   const now = Date.now();
   const dayAgo = now - 24 * 60 * 60 * 1000;
-  const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+  const preset = RANGE_PRESETS[range] ?? RANGE_PRESETS[DEFAULT_RANGE];
+  const rangeSinceTs = now - preset.ms;
   const heartbeats = collectHeartbeats();
   const restarts = recentRestarts(30);
-  const usage = buildUsageWindow(BOTS, twoWeeksAgo);
+  const usage = buildUsageWindow(BOTS, rangeSinceTs);
+  const botNames = BOTS.map((b) => b.name);
 
   const rows = heartbeats
     .map(({ bot, status, lastSeenTs }) => {
@@ -122,7 +132,7 @@ function renderPage(): string {
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="15">
+  <meta http-equiv="refresh" content="15;url=/?range=${range}">
   <title>Agent dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -159,14 +169,28 @@ function renderPage(): string {
   </table>
   <p class="text-slate-500 text-sm mb-8">Klikni na jméno bota v tabulce aktivity pro syrový log (posledních 200 řádků).</p>
 
-  <h2 class="text-lg font-semibold mb-2">Vyčerpání kvóty (posledních 14 dní)</h2>
+  <div class="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+    <h2 class="text-lg font-semibold">Vyčerpání kvóty</h2>
+    <div class="flex gap-1">
+      ${Object.entries(RANGE_PRESETS)
+        .map(
+          ([key, p]) => `
+        <a href="/?range=${key}" class="text-sm px-3 py-1 rounded ${
+          key === range ? "bg-sky-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+        }">${p.label}</a>`
+        )
+        .join("")}
+    </div>
+  </div>
   <div class="bg-slate-800 rounded p-4 mb-2">
-    ${renderUsageChart(usage, twoWeeksAgo, now)}
+    <div class="text-3xl font-semibold mb-3">${fmtTokens(usage.total)} <span class="text-sm font-normal text-slate-400">tokenů od posledního resetu (aktuálně)</span></div>
+    ${renderUsageChart(usage, rangeSinceTs, now, botNames)}
   </div>
   <p class="text-slate-500 text-sm mb-2">
-    Modrá čára je součet "čerstvých" tokenů (input + cache creation, bez recyklovaného cache
+    Šedá čára je součet "čerstvých" tokenů (input + cache creation, bez recyklovaného cache
     read) napříč všemi boty od posledního naražení na limit — boti sdílejí jeden Claude účet,
-    takže i kvótu. Je to jen odhad reálného vzorce, kterým Anthropic kvótu počítá, ne přesné číslo.
+    takže i kvótu. Barevné tečky ukazují, který bot k součtu v danou chvíli přispěl. Je to jen
+    odhad reálného vzorce, kterým Anthropic kvótu počítá, ne přesné číslo.
   </p>
   <table class="w-full text-left mb-8 bg-slate-800 rounded overflow-hidden">
     <thead class="bg-slate-700">
@@ -197,9 +221,12 @@ function renderPage(): string {
 
 export function startServer(): void {
   const server = createServer((req, res) => {
-    if (req.method === "GET" && req.url === "/") {
+    const url = req.url ? new URL(req.url, `http://${HOST}`) : null;
+
+    if (req.method === "GET" && url?.pathname === "/") {
+      const range = url.searchParams.get("range") ?? DEFAULT_RANGE;
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(renderPage());
+      res.end(renderPage(range in RANGE_PRESETS ? range : DEFAULT_RANGE));
       return;
     }
 
