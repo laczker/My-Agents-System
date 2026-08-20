@@ -68,6 +68,26 @@ povinný — bez něj uživatel o výměně vůbec neví, protože nemá příst
    (technická odpověď jde navíc zpátky botovi přes SendMessage)
 ```
 
+**`[TICHO]` marker — potlačení spamu z opakovaných `CronCreate` probuzení** (incident
+20.8., mailista): `bridge-ts` posílá do Telegramu bota živě KAŽDÝ textový blok z tahu,
+který si nikdo nevyžádal přes normální `send()` — to zahrnuje jak `SendMessage` od
+jiného bota (žádoucí, viz delegační protokol výše), tak i probuzení z vlastního
+`CronCreate` (`claudeProcess.ts`, `handleUnsolicitedLine`). Bot, co si přes `CronCreate`
+nastaví opakovanou dávkovou smyčku (např. mailista a noční čištění inboxu po dávkách),
+tím dřív pádem posílal do svého Telegramu jednu zprávu za každé probuzení (u mailisty
+13+ zpráv za noc) — i když si sám do vlastního progress souboru poznamenal, že
+"po Telegramu nebude psát po každé dávce". Ten záměr neměl v kódu žádnou páku, protože
+`handleUnsolicitedLine` posílá cokoliv neprázdného bezpodmínečně.
+
+Oprava: text unsolicited tahu začínající `SILENT_MARKER` (`"[TICHO]"`, exportováno z
+`claudeProcess.ts`) se do Telegramu vůbec neposílá. Bot ho použije, když ví, že jde o
+rutinní, opakovaný unsolicited tah (typicky mezikrok dávkové smyčky), kde živé
+posílání do Telegramu nedává smysl — genuinní cross-session viditelnost (začátek/konec
+delegovaného úkolu, eskalace, `SendMessage` od jiného bota) marker nepoužívá a chodí do
+Telegramu dál beze změny. Je to nástroj pro bota, ne vynucené pravidlo — pokud bot chce
+mít i u dávkové smyčky nějaký živý "pracuji" signál, může marker vynechat u vybraných
+probuzení (např. jen první a poslední v noci) a použít ho jen u těch mezilehlých.
+
 ## 2. Struktura jednoho bota (šablona pro založení dalšího)
 
 Každý bot = vlastní adresář `personal/<jméno>/`:

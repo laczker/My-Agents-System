@@ -20,6 +20,10 @@ export type RunClaudeOutcome =
   | { kind: "ok"; text: string }
   | { kind: "rate_limited"; resetsAtMs: number | null };
 
+/** Prefix, kterým bot může začít text unsolicited tahu, aby se NEODESLAL do
+ * Telegramu (viz `handleUnsolicitedLine`). Sdílené napříč všemi profily bota. */
+export const SILENT_MARKER = "[TICHO]";
+
 // Trvale běžící `claude` proces (stream-json na stdin/stdout), stejný vzor jako
 // bridge.py — jeden proces drží kontext nativně mezi zprávami, `--resume` slouží jen
 // jako záchranná síť po pádu, ne jako běžná cesta. Viz DECISIONS.md, 17.8.
@@ -128,7 +132,16 @@ export class ClaudeProcess {
    * poslední kus textu před `result` — mezikroky (např. "dostal jsem úkol od X",
    * "zpracovávám: ...") tiše zmizely. Dedupe přes `unsolicitedText` brání dvojímu
    * odeslání stejného textu, když `result.result` jen zopakuje poslední `assistant`
-   * blok. */
+   * blok.
+   *
+   * Výjimka: text začínající `SILENT_MARKER` se do Telegramu neposílá vůbec
+   * (marker se ořízne, zbytek zahodí). Slouží pro rutinní, opakované unsolicited
+   * tahy (typicky `CronCreate` probuzení uprostřed vlastní dávkové smyčky, např.
+   * mailistino noční čištění schránky), kde by živé posílání KAŽDÉHO probuzení
+   * do Telegramu bylo jen spam — na rozdíl od genuinní cross-session viditelnosti
+   * (SendMessage od jiného bota, začátek/konec dávkové práce, eskalace), která má
+   * dál chodit živě beze změny. Bota nic nenutí marker použít — je to nástroj pro
+   * bota, ne bezpečnostní mechanismus. Viz META_BOT.md. */
   private handleUnsolicitedLine(line: string | null): void {
     if (line === null) return;
     const trimmed = line.trim();
@@ -144,12 +157,14 @@ export class ClaudeProcess {
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
         this.unsolicitedText = text;
-        this.onUnsolicitedText?.(text);
+        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
       }
     }
     if (obj.type === "result") {
       const text = obj.result;
-      if (text && text !== this.unsolicitedText) this.onUnsolicitedText?.(text);
+      if (text && text !== this.unsolicitedText) {
+        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
+      }
       this.unsolicitedText = "";
     }
   }

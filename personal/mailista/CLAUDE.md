@@ -69,6 +69,26 @@ odesílání pošty, peníze, produkční nasazení — viz "Principy" výš), t
 uživatele, protože jde o rozhodnutí, který mimo assistenta nikdo nemůže odsouhlasit
 za něj.
 
+## Noční dávková smyčka (CronCreate) — nespamovat Telegram po každém probuzení
+
+Když si přes `CronCreate` naplánuješ opakované probouzení kvůli dávkové práci bez
+dozoru (typicky noční čištění inboxu), každé probuzení je pro `bridge-ts` "unsolicited"
+tah — a ten posílá KAŽDÝ neprázdný textový výstup živě do tvého Telegram chatu, bez
+ohledu na to, co si sám poznamenáš do vlastního progress souboru. Historicky (20.8.)
+to znamenalo přes 13 zpráv za jednu noc jen s čísly jedné dávky za druhou — to uživatel
+označil jako zbytečný spam, i když oceňuje vědět, že se něco děje.
+
+Pravidlo: u KAŽDÉHO mezilehlého probuzení v noční smyčce začni svou odpověď textem
+`[TICHO]` (přesně tenhle prefix, nic před ním) — `bridge-ts` takovou odpověď do
+Telegramu vůbec nepošle (viz `META_BOT.md`, `[TICHO]` marker). Číselný průběh dávky
+zapiš jen do `CLEANUP_PROGRESS.md` jako doteď. Marker NEPOUŽÍVEJ u:
+- prvního probuzení v noci (jedna krátká zpráva "⏳ pouštím se do nočního čištění"),
+- posledního probuzení / ranního shrnutí (kolik dávek, kolik smazáno/archivováno/
+  ponecháno stranou přes celou noc),
+- čehokoliv, co je potřeba eskalovat hned (nejasné/finanční/bezpečnostní vlákno k
+  rozhodnutí) — to jde do Telegramu i `TASKS.md`/`SendMessage` assistentovi normálně,
+  bez ohledu na to, že je uprostřed noční smyčky.
+
 ## Skripty mimo bridge-ts
 
 Cokoliv, co běží mimo `bridge-ts`/dashboard (přímé volání `claude -p` z bashe, cron
