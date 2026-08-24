@@ -181,3 +181,70 @@ Date:
 
 ---
 </content>
+## Ruční dodatečné spuštění daily_digest.sh mimo 8:00 okno
+
+Co:
+21.8. selhal ranní digest v 6:00 (`FAIL status=1`, shodou okolností se sdíleným
+rate limitem účtu, co ve stejnou dobu zasáhl i mailistu/assistenta). Assistant
+o pádu věděl (má stejnou třídu chyby u sebe) a požádal o ruční dodatečný běh,
+až limit pomine, ať se nečeká na zítřejší cron. `daily_digest.sh` ale měl
+tvrdou podmínku `HOUR != 08 → exit 0`, takže šel spustit jen editací skriptu.
+
+Přidal jsem `FORCE_RUN` env proměnnou (`FORCE_RUN=1 ./daily_digest.sh`), která
+hodinovou pojistku obejde, beze změny chování cronu (bez `FORCE_RUN` se chová
+stejně jako dřív). Ponechávám to natrvalo jako obecnou možnost pro budoucí
+ruční dodatečné běhy (výpadek, testování), místo abych to po jednom použití
+zase mazal.
+
+Date:
+2026-08-21
+
+---
+
+## Marker pro výpadky (rate limit): jedno varování na začátku, jedno na konci, ne spam
+
+Co:
+Po pátečním pádu (21.8., sdílený rate limit účtu) se stejná třída chyby vrátila
+i o víkendu — `daily_digest.sh` selhal i v sobotu i v neděli v 6:00, a protože
+tou dobou nikdo ručně nespustil `FORCE_RUN` (jako v pátek), přišly uživateli tři
+skoro identické „⚠️ nepodařilo se sestavit" zprávy za sebou za jeden a týž
+probíhající výpadek, místo jedné.
+
+Přidal jsem oběma skriptům (`daily_digest.sh`, `ai_news_digest.sh`) perzistentní
+marker (`.digest_outage.marker` / `.ai_news_outage.marker`) s časem první chyby:
+- První selhání založí marker a pošle JEDNU varovnou zprávu.
+- Dokud marker existuje a není starší než strop (48h denní / 96h týdenní),
+  hodinový cron ho bere jako pokyn k automatickému opakování i mimo svoje
+  normální okno (8:00 / pondělí 2:00) — bez další Telegram zprávy na každý
+  neúspěšný pokus, jen log.
+- Jakmile run konečně projde, marker se smaže a pošle se přesně JEDNA zpráva
+  navíc s prefixem „✅ Limit se mezitím obnovil...” (i pro `ai_news_digest.sh`,
+  když run projde, ale zrovna není co hlásit — recovery zpráva jde vždycky).
+- Pokud výpadek trvá déle než strop, automatické opakování se jednou vzdá
+  (jedna zpráva „končím, zkusí se znovu v příštím normálním okně"), marker se
+  smaže a čeká se na příští plánovaný běh — ochrana proti nekonečnému
+  hodinovému bušení do API, kdyby šlo o jinou chybu než rate limit.
+
+Ověřeno end-to-end mimo produkční data: kopie obou skriptů s nastavitelným
+`TEST_HOUR`/`TEST_DAY` a fake `claude`/`curl`/`npx` v `PATH`, otestované
+scénáře — první selhání (1 alert), retry mimo okno (0 nových alertů), úspěšné
+obnovení (1 recovery zpráva, marker smazán), žádný marker → no-op, marker
+starší než strop → give-up zpráva a marker smazán bez spuštění `claude`, a u
+`ai_news_digest.sh` navíc obnovení bez novinek k nahlášení.
+
+Why:
+Obecné pravidlo (viz i zadání od assistenta 24.8.): u čehokoliv
+opakovaného/cronového nikdy neopakovat stejné hlášení o probíhajícím problému
+při každém dalším pokusu — jen jedno na začátku výpadku a jedno při obnovení.
+Zároveň platí princip z `CLAUDE.md` (skripty mimo bridge-ts musí při chybě
+aktivně upozornit) — proto i cesta „vzdávám se" končí zprávou, ne tichým
+zastavením.
+
+Alternatives:
+Nechat to čistě na ručním `FORCE_RUN` jako dosud — zamítnuto, funguje jen když
+je zrovna někdo u chatu a všimne si toho (v pátek ano, o víkendu ne). Automatická
+retry bez markeru (prostě zkoušet každou hodinu bez ohledu na předchozí stav) by
+zase vedla přesně k tomu spamu, co řešíme.
+
+Date:
+2026-08-24

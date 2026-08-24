@@ -7,6 +7,13 @@
 # I tak: pošle zprávu JEN pokud model najde skutečně relevantní novinku, kterou
 # ještě neposlal (viz ai_news_seen.txt) — event-driven v tom smyslu, že prázdný
 # týden nic neodešle.
+#
+# Výpadek (rate limit apod.): stejný marker mechanismus jako daily_digest.sh
+# (viz DECISIONS.md, 24.8.) — OUTAGE_MARKER se založí při první chybě, varování
+# jde JEN JEDNOU za výpadek, dokud marker existuje a není starší než
+# OUTAGE_CAP_SECONDS se zkouší i mimo pondělní okno (bez dalších Telegram zpráv
+# na neúspěch, jen log), po obnovení jedna potvrzující zpráva, po překročení
+# stropu se to jednou nahlásí a čeká se na příští pondělní okno.
 set -uo pipefail
 
 DIR="/home/agent/agent-system/personal/zpravodaj"
@@ -19,15 +26,11 @@ TRIGGER_DAY="Mon"
 TRIGGER_HOUR="02"
 SEEN_MAX_LINES=300
 NO_NEWS_MARK="ŽÁDNÉ NOVINKY"
+OUTAGE_MARKER="$DIR/.ai_news_outage.marker"
+OUTAGE_CAP_SECONDS=$((96 * 3600))
 
 exec 9>"$LOCK"
 flock -n 9 || exit 0
-
-HOUR=$(TZ='Europe/Prague' date +%H)
-DAY=$(TZ='Europe/Prague' date +%a)
-if [ "$DAY" != "$TRIGGER_DAY" ] || [ "$HOUR" != "$TRIGGER_HOUR" ]; then
-  exit 0
-fi
 
 log() {
   echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') $1" >>"$LOG"
@@ -49,6 +52,25 @@ send_telegram() {
       -o /dev/null -w "  telegram HTTP %{http_code}\n" >>"$LOG" 2>&1
   done
 }
+
+HOUR=$(TZ='Europe/Prague' date +%H)
+DAY=$(TZ='Europe/Prague' date +%a)
+RETRY_MODE=0
+if [ "$DAY" != "$TRIGGER_DAY" ] || [ "$HOUR" != "$TRIGGER_HOUR" ]; then
+  if [ -f "$OUTAGE_MARKER" ]; then
+    MARKER_EPOCH=$(date -d "$(cat "$OUTAGE_MARKER")" +%s 2>/dev/null || echo 0)
+    AGE=$(($(date +%s) - MARKER_EPOCH))
+    if [ "$AGE" -gt "$OUTAGE_CAP_SECONDS" ]; then
+      log "Outage marker starší než strop (>$((OUTAGE_CAP_SECONDS / 3600))h), vzdávám automatické opakování"
+      send_telegram "⚠️ AI-news skript se nepodařilo rozběhnout ani po opakovaných pokusech přes $((OUTAGE_CAP_SECONDS / 3600)) hodin. Automatické opakování končí, zkusí se znovu až v příštím pondělním okně (2:00)."
+      rm -f "$OUTAGE_MARKER"
+      exit 0
+    fi
+    RETRY_MODE=1
+  else
+    exit 0
+  fi
+fi
 
 touch "$SEEN_FILE"
 SEEN_CONTENT=$(cat "$SEEN_FILE")
@@ -88,26 +110,39 @@ ODKAZY:
 TEASER: <JEDNA věta shrnující nejdůležitější nález/nálezy - jde do Telegram
 zprávy místo celého textu, s odkazem na plné znění>
 
-<samotný report v češtině, prostý text bez markdownu, každá položka: nadpis
-věci + pár vět vysvětlení do hloubky (ne jen jedna věta u technických věcí) +
-zdrojový odkaz na konci položky>
+<samotný report v češtině, prostý text bez markdownu. Každá položka jako
+odrážka v tomhle přesném tvaru:
+"• Titulek věci (cca 3-6 slov, žádný clickbait) | pár vět vysvětlení do
+hloubky (ne jen jedna věta u technických věcí) + zdrojový odkaz na konci."
+Titulek, mezera-pipe-mezera, vysvětlení s odkazem na konci - žádná jiná
+interpunkce mezi titulkem a pipe.>
 EOF
 )
 
-log "Start ($DAY $HOUR:00)"
+log "Start ($DAY $HOUR:00)$([ "$RETRY_MODE" = "1" ] && echo " (opakování po výpadku)")"
 OUTPUT=$(cd "$DIR" && claude -p "$PROMPT" --model opus --dangerously-skip-permissions 2>&1)
 STATUS=$?
 
 if [ $STATUS -ne 0 ]; then
   log "FAIL status=$STATUS output=$OUTPUT"
-  send_telegram "⚠️ AI-news skript selhal (status=$STATUS), viz ai_news_log.txt na serveru."
+  if [ ! -f "$OUTAGE_MARKER" ]; then
+    date -u +'%Y-%m-%dT%H:%M:%SZ' >"$OUTAGE_MARKER"
+    send_telegram "⚠️ AI-news skript selhal (status=$STATUS), viz ai_news_log.txt na serveru. Zkusím to automaticky znovu v dalších hodinách, dokud to nevyjde (max $((OUTAGE_CAP_SECONDS / 3600))h) — další hlášku pošlu, až se to podaří nebo až to vzdám."
+  fi
   exit 1
+fi
+
+RECOVERED=0
+if [ -f "$OUTAGE_MARKER" ]; then
+  rm -f "$OUTAGE_MARKER"
+  RECOVERED=1
 fi
 
 TRIMMED=$(echo "$OUTPUT" | sed -e 's/[[:space:]]*$//')
 
 if [ -z "$TRIMMED" ] || [ "$TRIMMED" = "$NO_NEWS_MARK" ]; then
   log "OK, nic relevantního"
+  [ "$RECOVERED" = "1" ] && send_telegram "✅ Limit se mezitím obnovil, AI-news skript teď proběhl v pořádku (aktuálně bez nových relevantních novinek)."
   exit 0
 fi
 
@@ -130,11 +165,16 @@ URL=$(cd "$WEBAPP_SERVER_DIR" && npx tsx src/addDigest.ts ai_news "$TITLE" "$TEA
 ADD_STATUS=$?
 rm -f "$TEASER_FILE" "$BODY_FILE"
 
+RECOVERY_PREFIX=""
+[ "$RECOVERED" = "1" ] && RECOVERY_PREFIX="✅ Limit se mezitím obnovil, AI-news se podařilo dodatečně sestavit:
+
+"
+
 if [ $ADD_STATUS -ne 0 ] || [ -z "$URL" ]; then
   log "WARN: addDigest selhal (status=$ADD_STATUS), posílám plný text jako fallback"
-  send_telegram "🧠 $BODY"
+  send_telegram "${RECOVERY_PREFIX}🧠 $BODY"
 else
-  send_telegram "🧠 $TEASER
+  send_telegram "${RECOVERY_PREFIX}🧠 $TEASER
 
 Celý report: $URL"
 fi
