@@ -10,29 +10,29 @@
 ## 1. Jak to vypadá dnes — diagram
 
 ```
-                         Uživatel (Telegram, 3 samostatné boty)
-                    @Assistant      @Zpravodaj      @Mailista
-                         │               │               │
-                 ┌───────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-                 │  bridge-ts   │ │  bridge-ts  │ │  bridge-ts  │
-                 │ (assistant)  │ │ (zpravodaj) │ │ (mailista)  │
-                 │ cwd=personal/│ │cwd=personal/│ │cwd=personal/│
-                 │  assistant/  │ │ zpravodaj/  │ │  mailista/  │
-                 └──────┬───────┘ └──────┬──────┘ └──────┬──────┘
-                        │  vlastní .env.<bot> token, vlastní
-                        │  claude proces (stream-json, trvalý)
-                        │  session_id.txt, chat_history.txt (fallback)
-                        │  job_queue_ts.json, outbox_ts.json
-                        │  heartbeat_ts.txt, turn_log_ts.jsonl
-                        │
-                        └──────── SendMessage (agent-to-agent) ────────┐
-                                  jediný kanál mezi boty navzájem;      │
-                                  žádné sdílené soubory kromě crontab   │
-                                  a samotných bridge-ts procesů (obojí ◄┘
-                                  je zdroj minulých incidentů, viz §4)
+                    Uživatel (Telegram, 4 samostatné boty)
+              @Assistant   @Zpravodaj   @Mailista   @HlidacJobu
+                    │            │            │            │
+              ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐
+              │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
+              │(assistant)││(zpravodaj)││(mailista) ││  (joby)   │
+              │cwd=personal││cwd=personal││cwd=personal││cwd=personal│
+              │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     │
+              └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
+                    │  vlastní .env.<bot> token, vlastní
+                    │  claude proces (stream-json, trvalý)
+                    │  session_id.txt, chat_history.txt (fallback)
+                    │  job_queue_ts.json, outbox_ts.json
+                    │  heartbeat_ts.txt, turn_log_ts.jsonl
+                    │
+                    └──────── SendMessage (agent-to-agent) ────────┐
+                              jediný kanál mezi boty navzájem;      │
+                              žádné sdílené soubory kromě crontab   │
+                              a samotných bridge-ts procesů (obojí ◄┘
+                              je zdroj minulých incidentů, viz §4)
 
   watchdog.sh (systémový cron, každou minutu)
-    hlídá heartbeat/pgrep 4 procesů: assistant, zpravodaj, mailista, dashboard
+    hlídá heartbeat/pgrep 5 procesů: assistant, zpravodaj, mailista, joby, dashboard
     → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
 
   personal/dashboard/ (5. proces, čtecí web, Tailscale 100.108.179.97:8765)
@@ -132,7 +132,7 @@ Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
 podle úkolu uvnitř jednoho bota, stejný vzor, jaký používá Ludwigův bridge.
 Pravidlo pro volbu při zakládání bota:
 - **`sonnet` (default)** — běžný bot s průběžnou konverzací/rozhodováním
-  (assistant, zpravodaj, mailista, budoucí programátor/finanční/jazykový bot).
+  (assistant, zpravodaj, mailista, joby, budoucí programátor/finanční/jazykový bot).
   Neměnit bez konkrétního důvodu (kvalita rozhodování u citlivých úkolů, např.
   mailista maže/archivuje maily, jde o data).
 - **`opus`** — jen tam, kde jde primárně o hloubku/kvalitu jednorázového

@@ -7,32 +7,31 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-- **Mailista: 4 vlákna od fakturace@endora.cz (prosinec 2020)** — 2 zálohové
-  listy + 2 upomínky k nim ("1. upomínka k zálohovému listu"), var. symboly
-  20485915 a 20485379. Skoro 6 let stará upomínka k platbě, pravděpodobně
-  dávno vyřešená, ale je to finanční věc (nízká autonomie), takže mailista
-  čeká na tvoje rozhodnutí smazat/archivovat/nechat. Vlákna zatím netknutá,
-  mailista pokračuje v ostatních dávkách dál.
+- **Mailista: bezpečnostní upozornění od Google, DVAKRÁT (vlákna `17cc11a8f965462b`
+  a `17ff76b10dd667db`)** — 20.8. a 24.8., nalezeno při nočním čištění, obě
+  `no-reply@accounts.google.com`, obě stejný text: "Kritické bezpečnostní
+  upozornění" — někdo znal heslo k Lukášovu Google účtu a pokusil se přihlásit
+  z **aplikace třetí strany**, Google pokus zablokoval. První 2021-10-27, druhé
+  2022-04-05 — jiný měsíc, stejný vzorec ("aplikace třetí strany"), takže to může
+  být opakovaně unikající/sdílené heslo, ne jednorázová náhoda. Na rozdíl od
+  běžných "nové zařízení přihlášeno" hlášek (ty mailista bez váhání archivuje)
+  tohle říká, že heslo bylo skutečně známé útočníkovi. Mailista obě vlákna
+  záměrně nechala netknutá (ne archivováno/smazáno) a nechává na Lukášovi, ať
+  zváží, jestli od té doby heslo změnil / nepoužívá ho jinde (případně jinde,
+  kde stejné heslo použil). Nic není potřeba udělat hned.
 
+- **Google/research agent (deep research)** — 19.8. potvrzeno: samostatný bot
+  (ne ad-hoc subagent zde), dedikovaný na deep research, `--model opus`.
+  Zjištěno dřív (18.8., subagent prohledal Ludwigův `Agent2Telegram`): žádný
+  vlastní deep-research vzor tam není, research jde přes stejné nativní
+  nástroje (`WebSearch`/`WebFetch`/subagent), co používá assistant; model per
+  bot je čistě statický `--model` flag v configu. Uživatel chce k novému
+  botovi přidat i nějaká pravidla/konvence, zatím neupřesnil jaká — **čeká se
+  na uživatele**, ať řekne konkrétní pravidla (např. jak vybírat/ověřovat
+  zdroje, kdy eskalovat/ptát se, formát výstupu), pak založit podle šablony
+  v `META_BOT.md`.
 ## Rozpracováno
 
-- **Noční dojetí (18.8. večer, uživatel jde spát)** — zadáno oběma botům přes
-  `SendMessage`, běží dynamický self-pace loop (assistant), co je bude
-  periodicky pobízet a hlídat: (1) **mailista** pokračuje v chronologickém
-  čištění nepřečtených vláken (viz jeho `chat_history.txt`) dávka po dávce,
-  cíl dostat se výrazně dál, orientačně k roku 2025; assistant ho pobízí dál,
-  když ztichne, a řeší nejasné případy, co mu mailista pošle zpět. (2)
-  **zpravodaj** má přes noc zůstat v klidu (žádný build/dev server kvůli OOM
-  riziku na 3.7GB RAM stroji, viz dnešní pád), jen počkat na ranní 8:00 cron
-  a nahlásit do vlastního Telegramu, jestli řetězec digest→webovka→Telegram
-  s odkazem opravdu fungoval mimo ruční test. Webapp mezitím commitnutý a
-  pushnutý (`26cb247`). **Upřesnění (zpravodaj-19, 23:5x):** zpravodaj se sám
-  v 8:00 nevzbudí (žádný nástroj na probuzení přes hodinu dopředu) — assistant
-  ho musí po 8:00 pražského času sám šťouchnout přes `SendMessage` (součást
-  téhož self-pace loopu, co pobízí mailistu), teprve pak zpravodaj zkontroluje
-  `digest_log.txt`/webovku a nahlásí výsledek. `daily_digest.sh` má vlastní
-  aktivní alert při tvrdém selhání bez ohledu na tohle šťouchnutí. Smazat
-  tuhle položku, až ráno oba přehledy dorazí a nic nebude viset.
 - **Přidělování modelů jednotlivým agentům/botům — mechanismus hotový** (19.8.) —
   `bridge-ts` teď čte `CLAUDE_MODEL` z `.env.<profil>` a posílá ho jako statický
   `--model` flag (default `sonnet`, žádná změna chování u žádného ze 3 běžících
@@ -40,27 +39,6 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   Commitnuto a boty restartované, ať je flag reálně aktivní. Otevřené zůstává jen
   konkrétní rozhodnutí u research agenta (opus, čeká na uživatele níž) — jinak nic
   neblokuje.
-- **Google/research agent (deep research)** — zjištěno (18.8., subagent prohledal
-  `/tmp/Agent2Telegram`, ne `/tmp/AgentsMonitoring` — to je jen supervisor bez
-  research/model logiky): Ludwigův bridge nemá žádný vlastní deep-research vzor,
-  research plně deleguje na nativní nástroje CLI (`WebSearch`/`WebFetch`/sub-agent
-  `Task`) — stejně jako to dělám já přes `Agent` tool. Model per bot je u něj čistě
-  statický přes přepsání `command` pole v configu (`--model` flag), žádné
-  automatické přepínání podle úkolu. Čeká se na uživatele, jestli chce (a) ad-hoc
-  subagent zde v assistant chatu, nebo (b) samostatný bot s vlastním configem/
-  Telegram chatem a `--model opus` staticky nastaveným.
-- **Nahrávání souborů/obrázků přes Telegram** — potřeba zjistit, jestli `bridge-ts`
-  dnes umí přijmout přílohu a předat ji do `claude -p`. Zatím neprozkoumáno.
-- **Zpravodaj: obsahové zadání AI novinky + obecné zprávy** (18.8.) — zadání
-  poslané přímo do chatu `zpravodaj-31` (SendMessage): AI novinky světové i lokální
-  se zaměřením na programování a vylepšování tohoto systému (deep research u
-  technických věcí, ne povrchní), + obecné zprávy ČR/svět (stačí zajímavé), bez
-  nucené denní frekvence. Zpravodaj si to zapsal do vlastních `DECISIONS.md`/
-  `TASKS.md`, ale samotnou implementaci (nový monitoring/rozhodování "co je dost
-  relevantní") chce mít potvrzenou přímo od Lukáše v jeho chatu, ne přes relay —
-  jde o novou autonomní automatizaci. **Čeká na uživatele** — buď napsat přímo
-  zpravodajovi, nebo potvrdit tady a přepošlu.
-
 ## Odloženo (po výše uvedeném)
 
 - **Infra-review agent** — občas projde systém a navrhne vylepšení, může reagovat
@@ -80,9 +58,59 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   vyžadovat explicitní schválení u konkrétních akcí, ne jen u založení.
 - **Učitel angličtiny bot** (nápad 19.8.) — zatím jen název nápadu, náplň/rozsah
   nedomluvený.
+- **Nákupní lístek** (nápad 24.8.) — zatím jen název nápadu, náplň/rozsah nedomluvený.
+- **Kuchařka** (nápad 24.8.) — zatím jen název nápadu, náplň/rozsah nedomluvený.
+- **Programátor bot na interní vývoj** (nápad 19.8., znovu zmíněn 24.8.) — dedikovaný
+  bot na vývoj/údržbu SW v tomhle systému (např. web pro zpravodaje). Zůstává beze
+  změny v "Odloženo" výš, žádný nový detail zatím nepřibyl.
 
 ## Hotovo
 
+- **Bot na hledání pracovních nabídek — založen (`joby`, `@LukasuvHlidacJobuBot`)**
+  (24.8.) — první nový specialista po assistant/zpravodaj/mailista. Profil a
+  kritéria "dost zajímavé nabídky" domluvené s uživatelem (React/JS/TS vývojář
+  ~1 rok, dřív automation engineer/Cypress ~2 roky a tester ~3 roky; hledá
+  junior/medior frontend/fullstack pozice; plat je hlavní motivace, aktuálně
+  65 000 Kč hrubého — hlásit jen nabídky viditelně nad tím, nebo bez uvedeného
+  platu, pokud pozice/firma vypadá slibně; lokalita bez omezení; jednou denně,
+  žádné "nic jsem nenašel" hlášení, jen shrnutí + odkaz, žádné akce navíc jako
+  odesílání přihlášky). Zapsáno do `personal/joby/CLAUDE.md`. Infrastruktura
+  založena podle šablony v `META_BOT.md` §2: `.env.joby` s tokenem, přidán do
+  `watchdog.sh`, proces nastartován a běží. Bot si má na začátku první session
+  sám nastavit vlastní denní `CronCreate` pro hledání (instrukce je v jeho
+  `CLAUDE.md`) — nekontrolováno, jestli to už proběhlo. `META_BOT.md` diagram
+  a přiřazení modelů aktualizováno na 4 boty. Necommitnuto (watchdog.sh,
+  META_BOT.md, TASKS.md).
+- **Zpravodaj: potlačit spam z opakovaných rate-limit hlášek** (24.8.) —
+  `daily_digest.sh`/`ai_news_digest.sh` posílaly novou "⚠️ nepodařilo se
+  sestavit" zprávu při KAŽDÉM dalším naplánovaném pokusu, i když šlo o jeden
+  probíhající výpadek (doloženo: pá/so/ne 21.–23.8. tři skoro identické alerty
+  za týž limit). Zpravodaj přidal marker soubor pro probíhající výpadek: první
+  selhání pošle 1 varování a založí marker; dokud existuje (strop 48h denní /
+  96h týdenní), cron zkouší automaticky znovu i mimo normální okno bez dalšího
+  spamu (jen log); po úspěchu 1 recovery zpráva; po překročení stropu 1 zpráva
+  o vzdání se. Otestováno end-to-end na kopiích skriptů s fake claude/curl/npx,
+  zapsáno do zpravodajova `DECISIONS.md`, pushnuto na `main` (standing
+  permission na `agent-system` repo).
+- **Noční dojetí mailisty (noc 19.8.→20.8.)** — proběhlo, potvrzení funguje:
+  9 dávek půlnoc–5:00, 701 vláken (501 smazáno jako marketing, 199 archivováno
+  jako transakční/bezpečnostní/administrativa, 1 ponecháno stranou — Google
+  security alert, viz položka výše v "Čeká na uživatele"). Pokryto od založení
+  schránky po listopad 2021, pokračuje další noc od
+  `is:unread in:inbox after:2021/09/01 before:2021/10/15`, stav v
+  `personal/mailista/CLEANUP_PROGRESS.md`. Výsledek poslán Lukášovi přímo do
+  mailistova Telegram chatu (podle konvence delegace), tady jen koordinační
+  potvrzení. Recurring — mailista pokračuje sám další noci, nesleduje se tu
+  dál jako otevřený úkol.
+- **Nahrávání souborů/obrázků přes Telegram** (19.8.) — zjištěno: `bridge-ts` to
+  už umí, funkčnost byla v systému od initial commitu (`bridge-ts/src/attachments.ts`
+  + `index.ts`, zděděno z původního `bridge.py`). Dokument i foto se stáhnou do
+  `personal/<bot>/inbox/` a do promptu se vloží `[PŘIPOJEN SOUBOR: <cesta>]` — proto
+  má assistantovo `CLAUDE.md` instrukci "pokud uživatel přiložil soubor, zkontroluj
+  jeho obsah v inboxu". Nic nebylo potřeba dodělávat, jen ověřit.
+- **Mailista: 6 vláken od fakturace@endora.cz (prosinec 2020)** (19.8.) — rozhodnuto
+  uživatelem archivovat (endoru nezná). Mailista archivoval — bylo jich 6, ne 4 jak
+  původně odhadnuto, ale všechny stejná skupina/rozhodnutí.
 - **Zpravodaj: webová stránka pro čtení digestů** (18.8., dokončeno zpravodajem
   21:5x) — server zapojen do `watchdog.sh` (bug: `pgrep` porovnával relativní
   cestu stejně jako proces, nikdy se nenašly → EADDRINUSE; oprava přes absolutní
