@@ -53,8 +53,16 @@
 5. Bot pracuje (může se doptat zpátky assistenta přes SendMessage, ne uživatele —
    výjimka: nevratné/destruktivní akce se ptají přímo uživatele)
 6. Bot --> svůj vlastní Telegram: VÝSLEDEK (ne jen přes SendMessage)
-7. Bot --SendMessage--> Assistant: krátké potvrzení/koordinace, ne hlavní kanál
 ```
+
+Kroky 3–4 (📥/⏳) jdou JEN do botova vlastního Telegramu, ne navíc přes `SendMessage`
+assistentovi — assistant ví, že úkol zadal, potvrzení přijetí by bylo duplicitní.
+Stejně tak prosté dokončení úkolu (krok 6) se `SendMessage` zpátky assistentovi
+nehlásí — to by byl jen šum navíc k výsledku, který už je v botově chatu (incident
+24.8., uživatel: "nebyl cíl, aby pokaždý co něco budou dělat tě budou informovat").
+`SendMessage` zpátky assistentovi (mimo krok 5) posílej **jen** když bot od něj
+skutečně potřebuje reakci — dotaz k zadání nebo blokující problém, ne jako obecné
+hlášení stavu.
 
 Opačný směr (bot pošle žádost/dotaz assistentovi, ne naopak) je zrcadlový a stejně
 povinný — bez něj uživatel o výměně vůbec neví, protože nemá přístup do assistant↔bot
@@ -87,6 +95,18 @@ delegovaného úkolu, eskalace, `SendMessage` od jiného bota) marker nepoužív
 Telegramu dál beze změny. Je to nástroj pro bota, ne vynucené pravidlo — pokud bot chce
 mít i u dávkové smyčky nějaký živý "pracuji" signál, může marker vynechat u vybraných
 probuzení (např. jen první a poslední v noci) a použít ho jen u těch mezilehlých.
+
+Stejný problém se ale netýká jen opakovaných `CronCreate` probuzení — platí pro
+KAŽDÝ unsolicited tah s víc kroky, včetně běžného cross-session zadání od jiného
+bota přes `SendMessage`. Delší úkol typicky obsahuje víc `assistant` textových bloků
+mezi jednotlivými nástroji (pracovní poznámky typu "teď upravím X", "kontroluju Y") a
+`handleUnsolicitedLine` je všechny pošle živě, ne jen finální výsledek — u zpravodaje
+(23.8.) to za jeden delší cross-session úkol reálně vygenerovalo 10 zpráv, místy i
+nekonzistentně v angličtině, protože nejde o promyšlené zprávy pro uživatele, ale
+nahlas psané pracovní myšlenky. Konvence proto teď je (viz `personal/zpravodaj/CLAUDE.md`,
+`personal/mailista/CLAUDE.md`, sekce "Cross-session zprávy od assistenta"): jedna
+nemarkovaná úvodní zpráva, pak `[TICHO]` na všechno mezi tím, a nemarkovaný finální
+výsledek (případně eskalace kdykoliv uprostřed).
 
 ## 2. Struktura jednoho bota (šablona pro založení dalšího)
 
@@ -132,8 +152,9 @@ Pravidlo pro volbu při zakládání bota:
    explicitně u všech tří botů, jednou to sklouzlo do angličtiny (zpravodaj) — teď je
    to explicitní pravidlo, ne nepsaná konvence.
 2. **Delegační protokol** (§1) — 📥/⏳ do vlastního chatu na začátku, výsledek do
-   vlastního chatu na konci, `SendMessage` jen jako potvrzení/koordinace. Platí
-   obousměrně.
+   vlastního chatu na konci; `SendMessage` zpátky assistentovi jen když bot
+   potřebuje jeho reakci (dotaz/blokující problém), NE jako rutinní potvrzení
+   přijetí nebo dokončení. Platí obousměrně.
 3. **Skripty mimo `bridge-ts`** (cron, přímé `claude -p` z bashe) jsou neviditelné
    pro `ListAgents`/dashboard/`job_queue_ts.json` — jediná stopa je jejich vlastní
    log. Musí při chybě aktivně poslat upozornění (Telegram/`SendMessage`), ne jen

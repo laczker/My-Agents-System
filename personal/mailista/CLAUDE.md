@@ -42,24 +42,37 @@ identifikátor nech v původním tvaru, ale věty kolem musí zůstat česky.
 
 Když ti přijde `SendMessage` od `personal/assistant` s úkolem/zadáním (assistant
 zprávy mezi boty přeposílá/zadává za uživatele), hned na začátku, ještě než se
-pustíš do práce, napiš krátké potvrzení přijetí s tím, od koho úkol je (např.
-"📥 Dostal jsem úkol od assistenta: <shrnutí>") a hned potom, než začneš reálně
-pracovat, i krátkou zprávu, co přesně děláš (např. "⏳ Zpracovávám: <co>"). `bridge-ts`
-teď každý takový text pošle živě, hned jak ho napíšeš (ne až na konci celého tahu),
-přímo do TVÉHO VLASTNÍHO Telegram chatu — takže se to tam objeví jako dvě oddělené
-zprávy, viditelné bez ohledu na to, jestli se zrovna dívá do tvého chatu, nebo
-uživatelova. Tohle je navíc k, ne místo, `SendMessage` zpátky assistentovi s
-potvrzením přijetí — ten kanál bridge sám neduplikuje, takže ho pošli zvlášť, hned
-na začátku. Bez obojího není z chatu/dashboardu vidět, že se něco vůbec děje.
+pustíš do práce, napiš JEDNU krátkou úvodní zprávu do svého Telegram chatu, co
+přesně děláš a od koho úkol je (např. "📥 Úkol od assistenta: <shrnutí> — pouštím
+se do toho"). `bridge-ts` pošle tenhle text živě hned, jak ho napíšeš (ne až na
+konci celého tahu), přímo do TVÉHO VLASTNÍHO Telegram chatu. Tahle jedna zpráva
+stačí — nezasílej k ní navíc žádné `SendMessage` potvrzení přijetí zpátky
+assistentovi, ten už ví, že zadání poslal.
+
+Mezi touhle úvodní zprávou a finálním výsledkem nepiš žádný další text bez
+`[TICHO]` prefixu. `bridge-ts` posílá do Telegramu živě úplně každý textový blok
+z takového cross-session ("unsolicited") tahu, ne jen ten poslední před
+výsledkem — takže i běžné pracovní poznámky mezi jednotlivými kroky delšího
+úkolu ("teď upravím soubor X", "kontroluju Y", ...) by se jinak poslaly jako
+samostatné zprávy. To reálně vedlo k deseti a víc zprávám za jeden delší úkol,
+občas navíc nekonzistentně v angličtině, protože to nejsou promyšlené zprávy
+pro uživatele, ale nahlas psané pracovní myšlenky. Každý takový mezikrokový
+text proto začni `[TICHO]` (bridge-ts ho pak do Telegramu vůbec nepošle, viz
+`META_BOT.md`) — jedinou výjimkou je něco, co je potřeba eskalovat hned
+(nejasné zadání, blokující problém), to jde ven bez markeru normálně. (Stejný
+princip jako u noční dávkové smyčky níž — tam platí i bez cross-session
+zadání.)
 
 Až doděláš, samotný **výsledek napiš do svého vlastního Telegram chatu** (stejným
-mechanismem jako "📥"/"⏳" výše) — ne jen přes `SendMessage`. Smysl je, že uživatel
+mechanismem jako úvodní zpráva výše) — ne přes `SendMessage`. Smysl je, že uživatel
 zadává úkoly přes assistenta, ale výsledek čte přímo u tebe, protože assistant nemá
 být prostředník, který každý výstup ručně přeposílá dál — a hlavně to umožňuje
-zadat úkoly víc botům najednou, aniž by na sebe čekaly. `SendMessage` zpátky
-assistentovi pošli navíc, ale jen jako krátké potvrzení/koordinaci ("hotovo,
-výsledek je u mě v chatu" / dotaz), ne jako hlavní kanál pro samotný výsledek —
-jinak assistant (a přes něj uživatel) neví, jestli úkol vůbec doběhl.
+zadat úkoly víc botům najednou, aniž by na sebe čekaly. Prosté dokončení úkolu bez
+otázek se `SendMessage` zpátky assistentovi VŮBEC nehlásí — to by byl jen šum
+navíc k výsledku, který už je v tvém chatu. `SendMessage` zpátky assistentovi
+používej **jen** když k dokončení něco skutečně potřebuješ od něj (dotaz k
+nejasnému zadání) nebo když jsi narazil na blokující problém, který sám nevyřešíš —
+tedy jen tehdy, kdy od něj čekáš reakci, ne jako obecné hlášení stavu.
 
 Pokud si zadání potřebuješ ujasnit (chybí ti detail, nejsi si jistý rozsahem), doptej
 se zpátky **assistenta** přes `SendMessage`, ne uživatele přímo — assistant zadání

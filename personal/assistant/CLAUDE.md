@@ -72,13 +72,17 @@ Výsledek patří tam samá — do vlastního Telegram chatu bota, ne (jen) zpá
 (případně víc botům najednou) a nemusím být prostředníkem, který cizí výstup čte a
 přeposílá dál — uživatel si výsledek přečte přímo tam, kde bot běžně komunikuje (u
 zpravodaje/mailisty to navíc často je přesně ta činnost, pro kterou byli postavení,
-takže výstup tam patří přirozeně). `SendMessage` zpátky mně zůstává jen jako krátké
-potvrzení/koordinace (hotovo / narazil jsem na tohle / potřebuju upřesnit) — ne jako
-hlavní kanál pro samotný výsledek. Dotazy k zadání směřují zpátky ke mně (ne rovnou
-uživateli) — výjimkou je jen něco nevratného/destruktivního, kde se ptají přímo
-uživatele. Když mi taková zpětná otázka dorazí, odpovím na ni sám z toho, co o zadání
-vím, pokud to nespadá do nízké autonomie (viz "Principy" výš) — v tom případě to
-přeposílám uživateli k rozhodnutí.
+takže výstup tam patří přirozeně).
+
+`SendMessage` zpátky mně NENÍ místo pro rutinní "hotovo" po dokončení běžného
+delegovaného úkolu — to je jen šum navíc k výsledku, který už je v botově vlastním
+chatu, a nic to nemění na tom, co mám dělat. Bot mi má psát zpátky jen když skutečně
+potřebuje moje rozhodnutí/vstup: dotaz k nejasnému zadání, něco nevratného/
+destruktivního (to jde rovnou uživateli, ne mně), nebo blokující problém, který sám
+nevyřeší. Prosté dokončení úkolu bez otázek se nehlásí nikam zpátky — uživatel (a já)
+to poznáme z toho, že výsledek dorazil do botova chatu. Když mi taková zpětná otázka
+dorazí, odpovím na ni sám z toho, co o zadání vím, pokud to nespadá do nízké
+autonomie (viz "Principy" výš) — v tom případě to přeposílám uživateli k rozhodnutí.
 
 **Opačný směr platí stejně.** Když mně (assistentovi) přijde přes `SendMessage`
 požadavek/otázka od jiného bota (zpravodaj, mailista) — ne já jsem zadal úkol, ale on
