@@ -7,40 +7,20 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-- **Mailista: bezpečnostní upozornění od Google, DVAKRÁT (vlákna `17cc11a8f965462b`
-  a `17ff76b10dd667db`)** — 20.8. a 24.8., nalezeno při nočním čištění, obě
-  `no-reply@accounts.google.com`, obě stejný text: "Kritické bezpečnostní
-  upozornění" — někdo znal heslo k Lukášovu Google účtu a pokusil se přihlásit
-  z **aplikace třetí strany**, Google pokus zablokoval. První 2021-10-27, druhé
-  2022-04-05 — jiný měsíc, stejný vzorec ("aplikace třetí strany"), takže to může
-  být opakovaně unikající/sdílené heslo, ne jednorázová náhoda. Na rozdíl od
-  běžných "nové zařízení přihlášeno" hlášek (ty mailista bez váhání archivuje)
-  tohle říká, že heslo bylo skutečně známé útočníkovi. Mailista obě vlákna
-  záměrně nechala netknutá (ne archivováno/smazáno) a nechává na Lukášovi, ať
-  zváží, jestli od té doby heslo změnil / nepoužívá ho jinde (případně jinde,
-  kde stejné heslo použil). Nic není potřeba udělat hned.
+*(momentálně nic)*
 
-- **Google/research agent (deep research)** — 19.8. potvrzeno: samostatný bot
-  (ne ad-hoc subagent zde), dedikovaný na deep research, `--model opus`.
-  Zjištěno dřív (18.8., subagent prohledal Ludwigův `Agent2Telegram`): žádný
-  vlastní deep-research vzor tam není, research jde přes stejné nativní
-  nástroje (`WebSearch`/`WebFetch`/subagent), co používá assistant; model per
-  bot je čistě statický `--model` flag v configu. Uživatel chce k novému
-  botovi přidat i nějaká pravidla/konvence, zatím neupřesnil jaká — **čeká se
-  na uživatele**, ať řekne konkrétní pravidla (např. jak vybírat/ověřovat
-  zdroje, kdy eskalovat/ptát se, formát výstupu), pak založit podle šablony
-  v `META_BOT.md`.
 ## Rozpracováno
 
 - **Přidělování modelů jednotlivým agentům/botům — mechanismus hotový** (19.8.) —
   `bridge-ts` teď čte `CLAUDE_MODEL` z `.env.<profil>` a posílá ho jako statický
   `--model` flag (default `sonnet`, žádná změna chování u žádného ze 3 běžících
   botů). Pravidlo pro volbu při zakládání dalšího bota je v `META_BOT.md` §2a.
-  Commitnuto a boty restartované, ať je flag reálně aktivní. Otevřené zůstává jen
-  konkrétní rozhodnutí u research agenta (opus, čeká na uživatele níž) — jinak nic
-  neblokuje.
+  Commitnuto a boty restartované, ať je flag reálně aktivní.
 ## Odloženo (po výše uvedeném)
 
+- **Ovládání hlasem (STT, čeština)** — zamítnuto uživatelem 24.8. po zjištění, že
+  by to vyžadovalo placenou externí službu (Whisper API); nechce za to platit,
+  preferuje psané zprávy. Neotevírat znovu bez podnětu od uživatele.
 - **Infra-review agent** — občas projde systém a navrhne vylepšení, může reagovat
   na AI-novinky agenta/zpravodaje. Založit až jako druhý/třetí specialista, ne první.
 - **Programátor bot** (nápad 19.8.) — dedikovaný bot na vývoj/údržbu SW v tomhle
@@ -58,14 +38,26 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   vyžadovat explicitní schválení u konkrétních akcí, ne jen u založení.
 - **Učitel angličtiny bot** (nápad 19.8.) — zatím jen název nápadu, náplň/rozsah
   nedomluvený.
-- **Nákupní lístek** (nápad 24.8.) — zatím jen název nápadu, náplň/rozsah nedomluvený.
 - **Kuchařka** (nápad 24.8.) — zatím jen název nápadu, náplň/rozsah nedomluvený.
+- **Research bot (opus)** — 24.8.: přesunuto sem z "Čeká na uživatele", uživatel
+  zatím nemá co researchovat, žádná pravidla/konvence tedy nejsou k domluvení.
+  Beze změny, dokud nepřijde konkrétní podnět.
 - **Programátor bot na interní vývoj** (nápad 19.8., znovu zmíněn 24.8.) — dedikovaný
   bot na vývoj/údržbu SW v tomhle systému (např. web pro zpravodaje). Zůstává beze
   změny v "Odloženo" výš, žádný nový detail zatím nepřibyl.
 
 ## Hotovo
 
+- **Nákupní lístek — založen jako samostatný bot** (24.8.) — nejdřív se zkusilo
+  vést seznam přímo v assistentovi (bez zakládání bota, bez čekání na
+  partnerčino chat ID), ale uživatel se pak rozhodl chtít to přece jen jako
+  samostatného bota. Založen `personal/nakup` podle šablony `META_BOT.md` §2:
+  `@LukasuvNakupBot`, token v `.env.nakup`, přidán do `watchdog.sh`, proces
+  nastartován a běží. `shopping_list.json` přenesen beze změny formátu
+  (`{name, added_at}`, žádná DB, žádný stav "koupeno"). Pravidla přesunuta z
+  `personal/assistant/CLAUDE.md` do `personal/nakup/CLAUDE.md`. Zatím jen
+  Lukášův chat — rozšíření na partnerku přes `TELEGRAM_CHAT_IDS_EXTRA` v
+  `.env.nakup` zůstává hotové, ale nepoužité, čeká na její Telegram chat ID.
 - **Bot na hledání pracovních nabídek — založen (`joby`, `@LukasuvHlidacJobuBot`)**
   (24.8.) — první nový specialista po assistant/zpravodaj/mailista. Profil a
   kritéria "dost zajímavé nabídky" domluvené s uživatelem (React/JS/TS vývojář
@@ -79,8 +71,7 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   `watchdog.sh`, proces nastartován a běží. Bot si má na začátku první session
   sám nastavit vlastní denní `CronCreate` pro hledání (instrukce je v jeho
   `CLAUDE.md`) — nekontrolováno, jestli to už proběhlo. `META_BOT.md` diagram
-  a přiřazení modelů aktualizováno na 4 boty. Necommitnuto (watchdog.sh,
-  META_BOT.md, TASKS.md).
+  a přiřazení modelů aktualizováno na 4 boty. Commitnuto a pushnuto (`1b57148`).
 - **Zpravodaj: potlačit spam z opakovaných rate-limit hlášek** (24.8.) —
   `daily_digest.sh`/`ai_news_digest.sh` posílaly novou "⚠️ nepodařilo se
   sestavit" zprávu při KAŽDÉM dalším naplánovaném pokusu, i když šlo o jeden

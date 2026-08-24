@@ -40,6 +40,12 @@ if ! pgrep -f "tsx src/index.ts joby" > /dev/null; then
     record_restart "joby" "proces neběžel"
 fi
 
+if ! pgrep -f "tsx src/index.ts nakup" > /dev/null; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
+    nohup npx tsx src/index.ts nakup >> /home/agent/agent-system/bridge_ts_nakup.log 2>&1 &
+    record_restart "nakup" "proces neběžel"
+fi
+
 if ! pgrep -f "tsx.*personal/dashboard/src/index.ts" > /dev/null; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') dashboard neběží, restartuji" >> /home/agent/agent-system/watchdog.log
     (cd /home/agent/agent-system/personal/dashboard && nohup npx tsx /home/agent/agent-system/personal/dashboard/src/index.ts >> /home/agent/agent-system/dashboard.log 2>&1 &)
