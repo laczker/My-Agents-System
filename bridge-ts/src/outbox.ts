@@ -1,10 +1,13 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { OUTBOX_FILE, OUTBOX_RETRY_INTERVAL_MS } from "./config.js";
+import { OUTBOX_FILE, OUTBOX_RETRY_INTERVAL_MS, TELEGRAM_CHAT_ID } from "./config.js";
 
 interface OutboxItem {
   id: string;
   text: string;
   createdAt: number;
+  /** Kam zprávu poslat. Staré položky z outboxu (před touhle změnou) klíč nemají —
+   * dopočítá se na `TELEGRAM_CHAT_ID`, stejné chování jako dřív. */
+  chatId?: string;
 }
 
 // Trvalá fronta odchozích zpráv (Ludwigův vzor). Zpráva se na disk zapíše DŘÍV, než
@@ -15,10 +18,10 @@ interface OutboxItem {
 // transkriptu, jen na tom, že zápis na disk proběhl dřív než síťové volání.
 export class Outbox {
   private items: OutboxItem[] = [];
-  private sendFn: (text: string) => Promise<void>;
+  private sendFn: (text: string, chatId: string) => Promise<void>;
   private flushing = false;
 
-  constructor(sendFn: (text: string) => Promise<void>) {
+  constructor(sendFn: (text: string, chatId: string) => Promise<void>) {
     this.sendFn = sendFn;
     this.load();
   }
@@ -36,8 +39,8 @@ export class Outbox {
     writeFileSync(OUTBOX_FILE, JSON.stringify(this.items));
   }
 
-  enqueue(text: string): void {
-    this.items.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, createdAt: Date.now() });
+  enqueue(text: string, chatId: string = TELEGRAM_CHAT_ID): void {
+    this.items.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, createdAt: Date.now(), chatId });
     this.persist();
     void this.flush();
   }
@@ -49,7 +52,7 @@ export class Outbox {
       while (this.items.length > 0) {
         const item = this.items[0];
         try {
-          await this.sendFn(item.text);
+          await this.sendFn(item.text, item.chatId ?? TELEGRAM_CHAT_ID);
         } catch (e) {
           console.error(`Odeslání selhalo, zůstává ve frontě (zkusím znovu za ${OUTBOX_RETRY_INTERVAL_MS}ms):`, e);
           return;

@@ -19,6 +19,16 @@ if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
   throw new Error(`TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID chybí v ${envFile}`);
 }
 
+// Volitelný seznam DALŠÍCH povolených chat ID (čárkou oddělené v `.env.<profil>`),
+// pro boty, se kterými má mluvit víc lidí (např. sdílený nákupní lístek pro dva
+// Telegram účty). Bez `TELEGRAM_CHAT_IDS_EXTRA` je chování stejné jako dřív — jen
+// `TELEGRAM_CHAT_ID`. `TELEGRAM_CHAT_ID` zůstává primární/první v seznamu.
+const extraChatIds = (process.env.TELEGRAM_CHAT_IDS_EXTRA ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+export const TELEGRAM_CHAT_IDS: string[] = [TELEGRAM_CHAT_ID, ...extraChatIds];
+
 // Adresář s trvalým stavem bota (session, historie, inbox, CLAUDE.md) — `cwd`, se
 // kterým se spouští `claude`, takže odsud se automaticky načte i CLAUDE.md daného
 // bota. Assistant má výchozí cestu kvůli zpětné kompatibilitě se sdíleným stavem

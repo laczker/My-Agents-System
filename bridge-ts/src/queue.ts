@@ -4,6 +4,11 @@ import { QUEUE_FILE } from "./config.js";
 export interface Job {
   userText: string;
   downloadedFileInfo: string;
+  /** Telegram chat, odkud zpráva přišla — výsledek se posílá zpátky sem, ne
+   * broadcastem na všechny povolené chaty (relevantní jen pro boty s víc než
+   * jedním chat ID, viz `TELEGRAM_CHAT_IDS_EXTRA`). Staré položky ve frontě
+   * (před touhle změnou) tenhle klíč nemají — dopočítá se na `TELEGRAM_CHAT_ID`. */
+  chatId?: string;
 }
 
 interface QueueState {

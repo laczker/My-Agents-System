@@ -1,5 +1,5 @@
 import { Bot, GrammyError } from "grammy";
-import { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, STARTUP_MESSAGE, RATE_LIMIT_FALLBACK_WAIT_MS, RATE_LIMIT_RESUME_BUFFER_MS } from "./config.js";
+import { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHAT_IDS, STARTUP_MESSAGE, RATE_LIMIT_FALLBACK_WAIT_MS, RATE_LIMIT_RESUME_BUFFER_MS } from "./config.js";
 import { ClaudeProcess, runClaude } from "./claudeProcess.js";
 import { getSessionId } from "./session.js";
 import { appendHistory } from "./history.js";
@@ -11,17 +11,27 @@ import { formatResetTimeLocal } from "./rateLimit.js";
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
 
-async function sendRaw(text: string): Promise<void> {
+async function sendRaw(text: string, chatId: string): Promise<void> {
   const chunks = text.match(/[\s\S]{1,4000}/g) ?? [text];
   for (const chunk of chunks) {
-    await bot.api.sendMessage(TELEGRAM_CHAT_ID, chunk);
+    await bot.api.sendMessage(chatId, chunk);
   }
 }
 
 const outbox = new Outbox(sendRaw);
 
-function sendMsg(text: string): void {
-  outbox.enqueue(text);
+/** Odpověď na konkrétní zprávu/úkol — patří tomu, kdo se ptal, ne všem povoleným
+ * chatům (relevantní jen u botů s víc než jedním chat ID). */
+function sendMsg(text: string, chatId: string = TELEGRAM_CHAT_ID): void {
+  outbox.enqueue(text, chatId);
+}
+
+/** Systémové zprávy bez vazby na konkrétní dotaz (start, rate limit, cross-session
+ * upozornění) — ty se týkají všech, kdo s botem mluví, takže jdou na všechny
+ * povolené chaty. U jednodochatového bota (`TELEGRAM_CHAT_IDS_EXTRA` nenastaveno)
+ * je to jen jeden chat, beze změny chování. */
+function broadcastMsg(text: string): void {
+  for (const chatId of TELEGRAM_CHAT_IDS) sendMsg(text, chatId);
 }
 
 const jobQueue: Job[] = [];
@@ -38,25 +48,29 @@ function persistQueue(): void {
 
 /** Naplánuje automatické pokračování fronty po obnovení Claude usage limitu a
  * hned o tom (s místním časem obnovení) informuje uživatele — dřív se rozpracovaný
- * úkol jen tiše ztratil, jakmile limit hlášku vydal jako "výsledek". */
+ * úkol jen tiše ztratil, jakmile limit hlášku vydal jako "výsledek". Při `isRestore`
+ * (watchdog restartoval proces, limit pořád neuplynul) se nová zpráva NEPOSÍLÁ —
+ * uživatel už byl informován při prvním zásahu do limitu a watchdog umí restartovat
+ * i vícekrát za hodinu, což by jinak vedlo k duplicitním "pořád čekám" hláškám
+ * (viz `watchdog.log`, historicky spam u uživatele).*/
 function enterRateLimitWait(resetsAtMs: number | null, isRestore = false): void {
   const resumeAt = resetsAtMs ?? Date.now() + RATE_LIMIT_FALLBACK_WAIT_MS;
   rateLimitResumeAtMs = resumeAt;
   persistQueue();
 
-  const when = resetsAtMs ? formatResetTimeLocal(resumeAt) : "zkusím to znovu za chvíli, přesný čas obnovení kvóta nehlásila";
-  sendMsg(
-    isRestore
-      ? `⏳ Po restartu pořád čekám na obnovení Claude usage limitu (${when}), rozpracovaný úkol zůstává ve frontě.`
-      : `⏳ Narazil jsem na Claude usage limit. Rozpracovaný úkol zůstává ve frontě, dokončím ho automaticky po obnovení kvóty — ${when}.`,
-  );
+  if (!isRestore) {
+    const when = resetsAtMs ? formatResetTimeLocal(resumeAt) : "zkusím to znovu za chvíli, přesný čas obnovení kvóta nehlásila";
+    broadcastMsg(
+      `⏳ Narazil jsem na Claude usage limit. Rozpracovaný úkol zůstává ve frontě, dokončím ho automaticky po obnovení kvóty — ${when}.`,
+    );
+  }
 
   if (rateLimitTimer) clearTimeout(rateLimitTimer);
   const delay = Math.max(resumeAt - Date.now(), 0) + RATE_LIMIT_RESUME_BUFFER_MS;
   rateLimitTimer = setTimeout(() => {
     rateLimitResumeAtMs = null;
     persistQueue();
-    sendMsg("🔄 Kvóta by měla být zpět, pokračuji v rozpracovaném úkolu...");
+    broadcastMsg("🔄 Kvóta by měla být zpět, pokračuji v rozpracovaném úkolu...");
     void processQueue();
   }, delay);
 }
@@ -70,6 +84,7 @@ async function processQueue(): Promise<void> {
   try {
     while (jobQueue.length > 0) {
       const job = jobQueue[0];
+      const jobChatId = job.chatId ?? TELEGRAM_CHAT_ID;
       let outcome: Awaited<ReturnType<typeof runClaude>>;
       try {
         outcome = await runClaude(claudeProcess, job.userText, job.downloadedFileInfo);
@@ -79,7 +94,7 @@ async function processQueue(): Promise<void> {
         // `neodpověděl včas (částečný text: ...)`) zmizel beze stopy. Job zůstává na
         // začátku fronty (neshiftnutý), takže se zkusí znovu při další zprávě.
         const msg = e instanceof Error ? e.message : String(e);
-        sendMsg(`⚠️ Tah selhal (${msg}). Úkol zůstává ve frontě, zkusím to znovu při další zprávě.`);
+        sendMsg(`⚠️ Tah selhal (${msg}). Úkol zůstává ve frontě, zkusím to znovu při další zprávě.`, jobChatId);
         return;
       }
       if (outcome.kind === "rate_limited") {
@@ -89,7 +104,7 @@ async function processQueue(): Promise<void> {
       jobQueue.shift();
       persistQueue();
       appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
-      sendMsg(`✅ Výsledek:\n${outcome.text}`);
+      sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
       touchHeartbeat();
     }
   } finally {
@@ -99,11 +114,13 @@ async function processQueue(): Promise<void> {
 
 // `onUnsolicitedText`: reakce na cross-session zprávu (SendMessage od jiného
 // bota), kterou runtime doručil mimo `send()` — bez tohohle by taková reakce
-// (např. "⏳ Zpracovávám úkol od tebe...") nešla vidět nikde v Telegramu.
-const claudeProcess = new ClaudeProcess((text) => sendMsg(text));
+// (např. "⏳ Zpracovávám úkol od tebe...") nešla vidět nikde v Telegramu. Není
+// vázaná na konkrétní chat, co se ptal, proto broadcast na všechny povolené.
+const claudeProcess = new ClaudeProcess((text) => broadcastMsg(text));
 
 bot.on("message", async (ctx) => {
-  if (String(ctx.chat.id) !== String(TELEGRAM_CHAT_ID)) return;
+  const chatId = String(ctx.chat.id);
+  if (!TELEGRAM_CHAT_IDS.includes(chatId)) return;
 
   const msg = ctx.message;
   let userText = msg.text ?? msg.caption ?? "";
@@ -115,7 +132,7 @@ bot.on("message", async (ctx) => {
     if ("path" in res) {
       downloadedFileInfo = `\n[PŘIPOJEN SOUBOR: ${res.path}]\n`;
     } else {
-      sendMsg(`⚠️ Nepodařilo se stáhnout přílohu '${fileName}': ${res.error}`);
+      sendMsg(`⚠️ Nepodařilo se stáhnout přílohu '${fileName}': ${res.error}`, chatId);
     }
   } else if (msg.photo && msg.photo.length > 0) {
     const photo = msg.photo[msg.photo.length - 1];
@@ -124,16 +141,16 @@ bot.on("message", async (ctx) => {
     if ("path" in res) {
       downloadedFileInfo = `\n[PŘIPOJEN SOUBOR: ${res.path}]\n`;
     } else {
-      sendMsg(`⚠️ Nepodařilo se stáhnout přílohu '${fileName}': ${res.error}`);
+      sendMsg(`⚠️ Nepodařilo se stáhnout přílohu '${fileName}': ${res.error}`, chatId);
     }
   }
 
   if (!userText && !downloadedFileInfo) return;
 
   const wasIdle = jobQueue.length === 0 && !processing;
-  jobQueue.push({ userText, downloadedFileInfo });
+  jobQueue.push({ userText, downloadedFileInfo, chatId });
   persistQueue();
-  sendMsg(wasIdle ? "⏳ Zpracovávám..." : `📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`);
+  sendMsg(wasIdle ? "⏳ Zpracovávám..." : `📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
 
   // Nečeká se na dokončení — handler se vrátí hned, aby grammY mohl přijmout další
   // zprávu okamžitě, i když tahle ještě běží (řeší "neodpovídáš, když pošlu víc zpráv").
@@ -192,7 +209,7 @@ async function main() {
   claudeProcess.start(getSessionId());
   restoreQueueState();
 
-  sendMsg(STARTUP_MESSAGE);
+  broadcastMsg(STARTUP_MESSAGE);
 
   if (jobQueue.length > 0) void processQueue();
 
