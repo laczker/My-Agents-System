@@ -7,7 +7,31 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-*(momentálně nic)*
+- **Deep analýza Ludwigova vzoru + návrhy vylepšení** (24.8.) — na žádost uživatele
+  proběhla research analýza (subagent + ověření GitHub odkazů): Ludwigovy tři
+  veřejné repo (`petrludwig-collab/Agent2Telegram`, `AgentsMonitoring`,
+  `HumanAgentWiki`) potvrzeny jako reálné. Návrh na 7 vylepšení fáze "osobní
+  život" (sdílený `notify` skript, SLA % na dashboardu, basic auth, sdílená
+  sémantická paměť napříč boty, hlasové zprávy do botů, ověřit heartbeat
+  vyhodnocení ve watchdogu, agregátní "system availability" karta) a 7 pro fázi
+  "továrna na SW" (worktree izolace per úkol, automatizovaný code-review gate,
+  testing/QA gate, cross-project orchestrátor, sandboxing per agent, sdílená
+  wiki mezi vývojovými agenty, kanban pohled na dashboardu + CI gating). Čeká se,
+  které z toho (pokud něco) uživatel chce reálně rozjet — zatím nic vybráno.
+- **Joby: denní hledání nastavené přes `CronCreate` zmizelo po restartu** (24.–25.8.)
+  — potvrzená nekonzistence napříč boty: joby si denní hledání naplánoval přes
+  `CronCreate` (session-scoped, žije jen v paměti běžícího `bridge-ts` procesu),
+  zpravodaj má stejný typ úlohy přes durable systémový `crontab` + samostatný
+  skript. Po restartu joby procesu (watchdog) se naplánovaný `CronCreate` ztratil
+  beze stopy, druhý den nepřišlo nic (vypadalo to jako "nic nenašel", ne jako
+  chyba). Joby si to samo diagnostikovalo ve vlastním chatu a navrhlo opravu
+  (`daily_job_search.sh` po vzoru zpravodaje + řádek v systémovém crontabu) —
+  čeká tam na uživatelovo schválení (crontab je sdílený zdroj, `META_BOT.md` §4).
+  Oprava zdroje problému hotová: `META_BOT.md` §3.5 (nové pravidlo: trvalé
+  opakované úlohy jen přes crontab+skript, nikdy jen `CronCreate`) a
+  `personal/joby/CLAUDE.md` (chybná instrukce "nastav si CronCreate" opravena na
+  durable vzor). Zbývá jen odpovědět joby v jeho vlastním chatu, jestli má
+  `daily_job_search.sh` + crontab řádek založit.
 
 ## Rozpracováno
 

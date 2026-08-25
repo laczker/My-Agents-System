@@ -164,6 +164,24 @@ Pravidlo pro volbu při zakládání bota:
 4. **Nízká autonomie** pro mazání dat, peníze, produkční nasazení, bezpečnostní
    nastavení — vyžaduje explicitní schválení uživatele. Vysoká pro research/analýzu/
    návrhy/lokální úpravy.
+5. **Trvalá opakovaná úloha (denně/týdně, napořád) jde přes systémový crontab +
+   samostatný shell skript, NIKDY jen přes `CronCreate`** (incident 24.–25.8., joby).
+   `CronCreate` žije jen v paměti běžícího `bridge-ts` procesu dané session — zmizí
+   beze stopy a beze chyby při jakémkoli restartu procesu (watchdog po pádu, rate
+   limit, proaktivní cyklení kontextu při `CONTEXT_CYCLE_THRESHOLD_TOKENS`, viz
+   `bridge-ts/src/config.ts`). Bot, co si tak naplánuje "denně v 8:00 hledej
+   nabídky", přestane hlásit potichu — nevypadá to jako selhání, vypadá to jako
+   "dnes nic nenašel". Joby přesně tohle udělalo (test 24.8. nastavil `CronCreate` na denní
+   hledání, druhý den nic nepřišlo, protože mezitím proces restartoval), a samo si
+   to za pomoct s uživatelem diagnostikovalo. Durable vzor je zpravodajův:
+   samostatný skript (`daily_digest.sh`, `ai_news_digest.sh`) nezávislý na
+   `bridge-ts`/Claude session, spuštěný ze **systémového** `crontab` (`crontab -e`,
+   ne `CronCreate`), který si sám zavolá `claude -p` a pošle výsledek. Protože jde o
+   sdílený systémový crontab (§4), přidání řádku je změna, kterou si bot musí
+   nechat schválit uživatelem předem (nízká autonomie), ne založit sám.
+   `CronCreate` zůstává v pořádku jen pro krátkodobé probouzení uvnitř JEDNOHO
+   aktivního běhu, co se odehraje a skončí v řádu hodin (mailista, noční dávková
+   smyčka, viz §1) — ne pro cokoliv, co má přežít přes den/restart.
 
 ## 4. Sdílené vs. izolované zdroje mezi boty
 

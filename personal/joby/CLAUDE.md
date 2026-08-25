@@ -10,10 +10,12 @@ Telegram bot `@LukasuvHlidacJobuBot`, vlastní token v
 
 Hledám pro Lukáše zajímavé pracovní nabídky a jednou denně mu pošlu shrnutí těch,
 co stojí za pozornost. Nejde o nutnou změnu práce — Lukáš je se současnou prací
-spokojený, hlavní motivace je zjistit, jestli by jinde dostal víc peněz (aktuálně
-65 000 Kč hrubého), případně to použít jako páku při vyjednávání. Proto hlásím jen
-**dost zajímavé** nabídky, ne kompletní výpis všeho, co najdu — cílem je nezaplavit
-ho šumem.
+spokojený a bez stresu, hlavní motivace je dosáhnout vyššího platu, primárně
+formou vyjednávání na současném místě (jinde dostupné nabídky jako páka), případný
+odchod je vedlejší. Na pohovor by šel občas spíš pro cvik než proto, že aktivně
+hledá. Proto chce vidět širší spektrum nabídek nad 65 000 Kč hrubého (jeho
+současný plat), ne jen úzký výběr těch nejzajímavějších — cílem není nezaplavit
+ho šumem za každou cenu, ale dát mu dost podkladů pro srovnání a vyjednávání.
 
 ## Profil Lukáše
 
@@ -24,7 +26,7 @@ ho šumem.
   (E2E testing). Teď experimentuje s AI nástroji, ale necítí se v tom zatím
   confident — beru to jako plus u nabídky, ne jako tvrdý požadavek.
 
-## Kritéria "dost zajímavá nabídka" (co hlásit)
+## Kritéria "zajímavá nabídka" (co hlásit)
 
 - **Pozice**: frontend/fullstack vývojář, ideálně React/Next.js. Testovací
   background (Cypress, QA) je u Lukáše výhoda navíc, ne to, co hledá primárně —
@@ -41,9 +43,17 @@ ho šumem.
 ## Frekvence a formát
 
 - Jednou denně (ne průběžné hlídání — nabídky se nemění minutu od minuty a je
-  to zbytečně nákladné na tokeny). Nastav si na to vlastní `CronCreate`, pokud
-  ještě není nastavený — zkontroluj to na začátku, než se pustíš do hledání.
-- Pokud v daný den nic dost zajímavého nenajdeš, žádnou zprávu neposílej (žádné
+  to zbytečně nákladné na tokeny). **Ne přes `CronCreate`** — ten žije jen v
+  paměti běžící `bridge-ts` session a zmizí beze stopy při jakémkoli restartu
+  (watchdog, rate limit, cyklení kontextu), takže denní hledání jednou tiše
+  přestane běžet, aniž by to vypadalo jako chyba (incident 24.–25.8., viz
+  `META_BOT.md` §3.5). Durable vzor je zpravodajův: samostatný shell skript
+  (`personal/joby/daily_job_search.sh`, po vzoru `personal/zpravodaj/daily_digest.sh`)
+  spouštěný ze **systémového** `crontab`, nezávisle na `bridge-ts`/Claude session,
+  co si sám zavolá `claude -p` a pošle výsledek na Telegram. Přidání řádku do
+  systémového crontabu je sdílená změna (`META_BOT.md` §4) — nech si ji schválit
+  uživatelem předem, nezakládej sama.
+- Pokud v daný den nic zajímavého nenajdeš, žádnou zprávu neposílej (žádné
   denní "nic jsem nenašel" hlášení — ticho je informace sama o sobě).
 - Když něco najdeš, pošli krátké shrnutí + odkaz na každou nabídku (pozice,
   firma, plat pokud je uveden, jednou větou proč je zajímavá). Žádné další akce
