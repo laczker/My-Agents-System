@@ -1,24 +1,24 @@
 # Poznámky pro budoucího meta-bota (bota, co zakládá další boty)
 
 > Doplňuje `ARCHITEKTURA.md` (sekce 10 „Orchestrator”, sekce 13 „Persistent context”).
-> Tam je původní záměr/vize, tady je **jak systém reálně funguje ke dni 2026-08-24**
-> a jaké konvence si dosavadní boti (assistant, zpravodaj, mailista, joby, nakup)
-> postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a spouštět
-> další boty, má tenhle soubor přečíst jako první — ušetří to znovuobjevování
-> stejných pravidel přes stejné incidenty.
+> Tam je původní záměr/vize, tady je **jak systém reálně funguje ke dni 2026-08-27**
+> a jaké konvence si dosavadní boti (assistant, zpravodaj, mailista, joby, nakup,
+> fbalbums) postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a
+> spouštět další boty, má tenhle soubor přečíst jako první — ušetří to
+> znovuobjevování stejných pravidel přes stejné incidenty.
 
 ## 1. Jak to vypadá dnes — diagram
 
 ```
-                    Uživatel (Telegram, 5 samostatných botů)
-      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup
-            │            │            │            │          │
-      ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐
-      │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
-      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  │
-      │cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal│
-      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    │
-      └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
+                    Uživatel (Telegram, 6 samostatných botů)
+      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup   @FbAlbums
+            │            │            │            │          │         │
+      ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐┌─▼─────────┐
+      │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
+      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  ││ (fbalbums)│
+      │cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal│
+      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    ││ /fbalbums/ │
+      └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
                     │  vlastní .env.<bot> token, vlastní
                     │  claude proces (stream-json, trvalý)
                     │  session_id.txt, chat_history.txt (fallback)
@@ -32,8 +32,8 @@
                               je zdroj minulých incidentů, viz §4)
 
   watchdog.sh (systémový cron, každou minutu)
-    hlídá heartbeat/pgrep 6 procesů: assistant, zpravodaj, mailista, joby, nakup, dashboard
-    → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
+    hlídá heartbeat/pgrep 7 procesů: assistant, zpravodaj, mailista, joby, nakup,
+    fbalbums, dashboard → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
 
   personal/dashboard/ (5. proces, čtecí web, Tailscale 100.108.179.97:8765)
     - stav botů (heartbeat), aktivita 24h, kvóta, log proklik, restart tlačítko
@@ -125,6 +125,15 @@ Každý bot = vlastní adresář `personal/<jméno>/`:
 - záznam v `watchdog.sh` (host-level cron skript, mimo `personal/`) — bez něj bota
   nikdo nenahodí po pádu
 
+**Výjimka pro dedikované vývojové boty** (první příklad: `fbalbums`, 27.8.): pokud bot
+vyvíjí vlastní produkt (appku), samotný kód produktu **nepatří do `personal/<jméno>/`
+ani do `agent-system` repa vůbec** — jde do vlastního odděleného adresáře/git repa
+(u fbalbums `/home/agent/fbalbums`, lokální, zatím bez GitHub remote), protože má jiné
+secrets, jinou expozici a jinou životnost než `agent-system`. `personal/<jméno>/` u
+takového bota zůstává jen jeho provozní domov (instrukce, stav, Telegram) — worktree
+izolace pro jednotlivé iterace (`EnterWorktree`/`ExitWorktree`) se otvírá nad tím
+odděleným produktovým repem, ne nad `agent-system`.
+
 ## 2a. Přiřazování modelu botovi/subagentovi
 
 Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
@@ -132,8 +141,8 @@ Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
 podle úkolu uvnitř jednoho bota, stejný vzor, jaký používá Ludwigův bridge.
 Pravidlo pro volbu při zakládání bota:
 - **`sonnet` (default)** — běžný bot s průběžnou konverzací/rozhodováním
-  (assistant, zpravodaj, mailista, joby, nakup, budoucí programátor/finanční/
-  jazykový bot).
+  (assistant, zpravodaj, mailista, joby, nakup, fbalbums, budoucí programátor/
+  finanční/jazykový bot).
   Neměnit bez konkrétního důvodu (kvalita rozhodování u citlivých úkolů, např.
   mailista maže/archivuje maily, jde o data).
 - **`opus`** — jen tam, kde jde primárně o hloubku/kvalitu jednorázového

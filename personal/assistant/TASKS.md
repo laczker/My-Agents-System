@@ -7,6 +7,38 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
+- **AI Studio → první produkt FB Albums — bot založen, čeká na Telegram token**
+  (25.–27.8.) — uživatel poslal vlastní vizi (`AI_STUDIO_VIZE.md`), po diskusi
+  ujasněno: nechce vyvíjet v assistant chatu ani ručně na vlastním PC, chce
+  dedikovaného bota, co vyvíjí **autonomně** (role analytik→vývojář→reviewer
+  jako krátkodobí subagenti na iteraci, git worktree izolace, dvě schvalovací
+  brány na iteraci — spec před kódem, konsolidovaný checkpoint spec+diff+review
+  před mergem), s ovládáním/review z mobilu přes vlastní Telegram chat (paměti
+  "assistant-not-for-product-dev-work", "user-as-code-reviewer-and-approver",
+  "product-dev-bot-multi-role-iteration-template"). 27.8. deep research na best
+  practices + tech stack uložen do `AI_DEV_WORKFLOW_TEMPLATE.md` (workflow
+  potvrzen; stack: Python dávková pipeline parsing/EXIF/dedup/náhledy → SQLite
+  → Node/TS+React, self-hosted Tailscale). Zadání produktu upřesněno: **jedna
+  konverzace = jedno album**, konverzace se nemíchají, zprávy/text se do alba
+  zatím vůbec nepromítají (jen fotky) — uživatel zatím neví, jak by propojení
+  s textem mělo dávat smysl, neřešit sám od sebe. 27.8. bot reálně založen podle
+  `META_BOT.md` šablony: `personal/fbalbums/CLAUDE.md` (zadání + vývojový cyklus
+  zapsané), `.env.fbalbums` (placeholder token), zápis do `watchdog.sh`,
+  `META_BOT.md` aktualizován na 6 botů (+ nová výjimka v §2: kód produktu žije
+  mimo `agent-system`, ne v `personal/fbalbums/`). Produktové repo založeno:
+  `/home/agent/fbalbums`, lokální git, branch `main`, zatím bez remote, prázdné
+  (žádný commit).
+  **Blokuje spuštění**: 1) potřeba reálný Telegram bot token od uživatele
+  (@BotFather → nový bot, navrhované jméno handle podobné ostatním, např.
+  `LukasuvFbAlbumsBot`) — `.env.fbalbums` má zatím jen placeholder
+  `REPLACE_ME_TOKEN_OD_BOTFATHER`, proces bez něj nenaběhne; 2) fotky (6× 2,5 GB)
+  ještě nejsou na Google Drive a Drive MCP connector byl k 27.8. neautorizovaný
+  — ověřit před první iterací, jestli je teď (`mcp__claude_ai_Google_Drive__*`
+  nástroje se objevily v nabídce 27.8., autorizační stav needěláno ověřen).
+  Jakmile dorazí token, doplnit do `.env.fbalbums` a spustit (`cd bridge-ts &&
+  nohup npx tsx src/index.ts fbalbums >> ../bridge_ts_fbalbums.log 2>&1 &`, nebo
+  počkat na watchdog), commitnout založení do `agent-system` gitu.
+
 - **Deep analýza Ludwigova vzoru + návrhy vylepšení** (24.8.) — na žádost uživatele
   proběhla research analýza (subagent + ověření GitHub odkazů): Ludwigovy tři
   veřejné repo (`petrludwig-collab/Agent2Telegram`, `AgentsMonitoring`,
@@ -18,20 +50,6 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   testing/QA gate, cross-project orchestrátor, sandboxing per agent, sdílená
   wiki mezi vývojovými agenty, kanban pohled na dashboardu + CI gating). Čeká se,
   které z toho (pokud něco) uživatel chce reálně rozjet — zatím nic vybráno.
-- **Joby: denní hledání nastavené přes `CronCreate` zmizelo po restartu** (24.–25.8.)
-  — potvrzená nekonzistence napříč boty: joby si denní hledání naplánoval přes
-  `CronCreate` (session-scoped, žije jen v paměti běžícího `bridge-ts` procesu),
-  zpravodaj má stejný typ úlohy přes durable systémový `crontab` + samostatný
-  skript. Po restartu joby procesu (watchdog) se naplánovaný `CronCreate` ztratil
-  beze stopy, druhý den nepřišlo nic (vypadalo to jako "nic nenašel", ne jako
-  chyba). Joby si to samo diagnostikovalo ve vlastním chatu a navrhlo opravu
-  (`daily_job_search.sh` po vzoru zpravodaje + řádek v systémovém crontabu) —
-  čeká tam na uživatelovo schválení (crontab je sdílený zdroj, `META_BOT.md` §4).
-  Oprava zdroje problému hotová: `META_BOT.md` §3.5 (nové pravidlo: trvalé
-  opakované úlohy jen přes crontab+skript, nikdy jen `CronCreate`) a
-  `personal/joby/CLAUDE.md` (chybná instrukce "nastav si CronCreate" opravena na
-  durable vzor). Zbývá jen odpovědět joby v jeho vlastním chatu, jestli má
-  `daily_job_search.sh` + crontab řádek založit.
 
 ## Rozpracováno
 
@@ -72,6 +90,19 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Hotovo
 
+- **Joby: denní hledání přepnuto z `CronCreate` na crontab+skript** (24.–25.8.)
+  — potvrzená nekonzistence napříč boty: joby si denní hledání původně
+  naplánoval přes `CronCreate` (session-scoped, žije jen v paměti běžícího
+  `bridge-ts` procesu), zatímco zpravodaj má stejný typ úlohy přes durable
+  systémový `crontab` + samostatný skript. Po restartu joby procesu (watchdog)
+  se naplánovaný `CronCreate` ztratil beze stopy, druhý den nepřišlo nic.
+  Oprava zdroje problému: `META_BOT.md` §3.5 (nové pravidlo: trvalé opakované
+  úlohy jen přes crontab+skript, nikdy jen `CronCreate`) a
+  `personal/joby/CLAUDE.md` (chybná instrukce opravena). Joby si sám ve vlastním
+  chatu navrhl `daily_job_search.sh` (DST-safe 8:00 pražského času, dedup přes
+  `reported_jobs.txt`, outage marker po vzoru zpravodaje) + řádek v systémovém
+  crontabu, uživatel schválil ("ano"), založeno a ověřeno: dnešní ranní běh
+  (25.8. 8:34) proběhl úspěšně, nahlásil nabídky přímo do joby Telegram chatu.
 - **Nákupní lístek — založen jako samostatný bot** (24.8.) — nejdřív se zkusilo
   vést seznam přímo v assistentovi (bez zakládání bota, bez čekání na
   partnerčino chat ID), ale uživatel se pak rozhodl chtít to přece jen jako
