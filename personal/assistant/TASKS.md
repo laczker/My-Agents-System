@@ -7,38 +7,6 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Čeká na uživatele
 
-- **AI Studio → první produkt FB Albums — bot založen, čeká na Telegram token**
-  (25.–27.8.) — uživatel poslal vlastní vizi (`AI_STUDIO_VIZE.md`), po diskusi
-  ujasněno: nechce vyvíjet v assistant chatu ani ručně na vlastním PC, chce
-  dedikovaného bota, co vyvíjí **autonomně** (role analytik→vývojář→reviewer
-  jako krátkodobí subagenti na iteraci, git worktree izolace, dvě schvalovací
-  brány na iteraci — spec před kódem, konsolidovaný checkpoint spec+diff+review
-  před mergem), s ovládáním/review z mobilu přes vlastní Telegram chat (paměti
-  "assistant-not-for-product-dev-work", "user-as-code-reviewer-and-approver",
-  "product-dev-bot-multi-role-iteration-template"). 27.8. deep research na best
-  practices + tech stack uložen do `AI_DEV_WORKFLOW_TEMPLATE.md` (workflow
-  potvrzen; stack: Python dávková pipeline parsing/EXIF/dedup/náhledy → SQLite
-  → Node/TS+React, self-hosted Tailscale). Zadání produktu upřesněno: **jedna
-  konverzace = jedno album**, konverzace se nemíchají, zprávy/text se do alba
-  zatím vůbec nepromítají (jen fotky) — uživatel zatím neví, jak by propojení
-  s textem mělo dávat smysl, neřešit sám od sebe. 27.8. bot reálně založen podle
-  `META_BOT.md` šablony: `personal/fbalbums/CLAUDE.md` (zadání + vývojový cyklus
-  zapsané), `.env.fbalbums` (placeholder token), zápis do `watchdog.sh`,
-  `META_BOT.md` aktualizován na 6 botů (+ nová výjimka v §2: kód produktu žije
-  mimo `agent-system`, ne v `personal/fbalbums/`). Produktové repo založeno:
-  `/home/agent/fbalbums`, lokální git, branch `main`, zatím bez remote, prázdné
-  (žádný commit).
-  **Blokuje spuštění**: 1) potřeba reálný Telegram bot token od uživatele
-  (@BotFather → nový bot, navrhované jméno handle podobné ostatním, např.
-  `LukasuvFbAlbumsBot`) — `.env.fbalbums` má zatím jen placeholder
-  `REPLACE_ME_TOKEN_OD_BOTFATHER`, proces bez něj nenaběhne; 2) fotky (6× 2,5 GB)
-  ještě nejsou na Google Drive a Drive MCP connector byl k 27.8. neautorizovaný
-  — ověřit před první iterací, jestli je teď (`mcp__claude_ai_Google_Drive__*`
-  nástroje se objevily v nabídce 27.8., autorizační stav needěláno ověřen).
-  Jakmile dorazí token, doplnit do `.env.fbalbums` a spustit (`cd bridge-ts &&
-  nohup npx tsx src/index.ts fbalbums >> ../bridge_ts_fbalbums.log 2>&1 &`, nebo
-  počkat na watchdog), commitnout založení do `agent-system` gitu.
-
 - **Deep analýza Ludwigova vzoru + návrhy vylepšení** (24.8.) — na žádost uživatele
   proběhla research analýza (subagent + ověření GitHub odkazů): Ludwigovy tři
   veřejné repo (`petrludwig-collab/Agent2Telegram`, `AgentsMonitoring`,
@@ -90,6 +58,27 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 
 ## Hotovo
 
+- **AI Studio → první produkt FB Albums — bot založen a běží** (25.8.–4.9.) —
+  uživatel poslal vlastní vizi (`AI_STUDIO_VIZE.md`), po diskusi ujasněno: nechce
+  vyvíjet v assistant chatu ani ručně na vlastním PC, chce dedikovaného bota, co
+  vyvíjí **autonomně** (role analytik→vývojář→reviewer jako krátkodobí subagenti
+  na iteraci, git worktree izolace, dvě schvalovací brány — spec před kódem,
+  konsolidovaný checkpoint spec+diff+review před mergem), s ovládáním/review z
+  mobilu přes vlastní Telegram chat (paměti "assistant-not-for-product-dev-work",
+  "user-as-code-reviewer-and-approver", "product-dev-bot-multi-role-iteration-
+  template"). Deep research na best practices + tech stack uložen do
+  `AI_DEV_WORKFLOW_TEMPLATE.md` (stack: Python dávková pipeline parsing/EXIF/
+  dedup/náhledy → SQLite → Node/TS+React, self-hosted Tailscale). Zadání produktu:
+  **jedna konverzace = jedno album**, konverzace se nemíchají, zprávy/text se do
+  alba zatím vůbec nepromítají (jen fotky). Bot založen podle `META_BOT.md`
+  šablony: `personal/fbalbums/CLAUDE.md` (zadání + vývojový cyklus), token v
+  `.env.fbalbums`, zápis do `watchdog.sh`, `META_BOT.md` aktualizován na 6 botů
+  (+ nová výjimka v §2: kód produktu žije mimo `agent-system`, v odděleném
+  lokálním repu `/home/agent/fbalbums`, zatím bez remote). Proces nastartován a
+  ověřen (heartbeat čerstvý, napojení na Telegram úspěšné), commitnuto a
+  pushnuto (`8975986`). Od teď veškerý další vývoj/rozhodování o FB Albums patří
+  do jeho vlastního Telegram chatu, ne sem — jediné co ještě chybí, je nahrání
+  FB exportu fotek na Google Drive uživatelem, což řeší přímo s botem.
 - **Joby: denní hledání přepnuto z `CronCreate` na crontab+skript** (24.–25.8.)
   — potvrzená nekonzistence napříč boty: joby si denní hledání původně
   naplánoval přes `CronCreate` (session-scoped, žije jen v paměti běžícího
