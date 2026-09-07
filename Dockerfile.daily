@@ -1,0 +1,17 @@
+# Docker pilot, iterace 1 (personal/devops/CLAUDE.md) — obraz pro skupinu denních
+# botů (assistant, zpravodaj, mailista, joby, nakup), co sdílejí bridge-ts engine.
+# Absolutní cesty uvnitř kontejneru zrcadlí hostitelské (/home/agent/agent-system/...),
+# aby .env.<profil> (BOT_DIR apod., viz bridge-ts/src/config.ts) fungovaly beze změny
+# a stavové soubory zůstaly ve stejném formátu pro případnou budoucí migraci.
+FROM node:20-slim
+
+WORKDIR /home/agent/agent-system/bridge-ts
+COPY bridge-ts/package.json bridge-ts/package-lock.json ./
+RUN npm ci
+COPY bridge-ts/tsconfig.json ./tsconfig.json
+COPY bridge-ts/src ./src
+
+COPY start-daily.sh /start-daily.sh
+RUN chmod +x /start-daily.sh
+
+CMD ["/start-daily.sh"]
