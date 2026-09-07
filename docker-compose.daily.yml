@@ -1,8 +1,8 @@
-# Docker pilot, iterace 1 (personal/devops/CLAUDE.md) — skupina denních botů
+# Docker pilot, iterace 1+2 (personal/devops/CLAUDE.md) — skupina denních botů
 # (assistant, zpravodaj, mailista, joby, nakup) v jednom kontejneru vedle toho, co
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
 # tahle iterace jen ověřuje mechaniku (build, start, čitelnost stavu přes volume
-# mount), migraci živého provozu řeší až budoucí iterace.
+# mount, claude CLI auth), migraci živého provozu řeší až budoucí iterace.
 services:
   daily-bots:
     build:
@@ -11,8 +11,11 @@ services:
     # Musí sedět s hostitelským uživatelem (agent, uid/gid 1000) — jinak soubory,
     # co bridge-ts zapíše do bind-mountnutých personal/<profil> adresářů (heartbeat,
     # session, fronta...), skončí na hostu vlastněné rootem a host uživatel k nim
-    # ztratí přístup (zjištěno code review, iterace 1).
+    # ztratí přístup (zjištěno code review, iterace 1). Container `claude` CLI hledá
+    # auth podle $HOME, proto musí sedět i s cestou mountů níž.
     user: "1000:1000"
+    environment:
+      - HOME=/home/agent
     volumes:
       - ./.env:/home/agent/agent-system/.env:ro
       - ./.env.zpravodaj:/home/agent/agent-system/.env.zpravodaj:ro
@@ -24,4 +27,8 @@ services:
       - ./personal/mailista:/home/agent/agent-system/personal/mailista
       - ./personal/joby:/home/agent/agent-system/personal/joby
       - ./personal/nakup:/home/agent/agent-system/personal/nakup
+      # Sdílený token s hostem, read-only — pokud by CLI v kontejneru potřebovalo
+      # refresh zapsat, selže (přijatelné pro jednorázový test iterace 2, viz spec).
+      - ${HOME}/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
+      - ${HOME}/.claude.json:/home/agent/.claude.json:ro
     restart: "no"
