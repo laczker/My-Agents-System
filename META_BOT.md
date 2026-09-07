@@ -263,14 +263,31 @@ ve stejném formátu jako na hostu. Kontejner běží pod `user: "1000:1000"` (s
 uid/gid jako hostitelský `agent`), jinak by soubory zapsané bridge-ts do
 bind-mountnutých `personal/<profil>` adresářů skončily na hostu vlastněné rootem.
 `bridge_ts_<profil>_claude_stderr.log` (na rozdíl od heartbeatu) přes volume mount
-zatím čitelný NENÍ — zůstává jen uvnitř kontejneru, řeší se spolu s Claude CLI
-autentizací v pozdější iteraci.
+zatím čitelný NENÍ — zůstává jen uvnitř kontejneru a mizí s `docker compose down`
+(viz iterace 2 níž, `chown` řeší jen zápis, ne trvalou viditelnost na hostu).
 
-Záměrně MIMO rozsah iterace 1 (viz `personal/devops/CLAUDE.md`): napojení na
+Iterace 2 (stejné soubory): `claude` CLI uvnitř kontejneru. `Dockerfile.daily`
+instaluje `@anthropic-ai/claude-code` globálně přes npm, verze připnutá na
+shodu s hostem (ruční bump při aktualizaci hostitelského CLI) — bez CLI bridge-ts
+padal na `ENOENT` (`spawn("claude", ...)` v `claudeProcess.ts`). Autentizace jde
+přes read-only bind mount hostitelských `~/.claude/.credentials.json` a
+`~/.claude.json` (cesta natvrdo, ne `${HOME}`, ať se nerozbije při pozdějším
+spouštění mimo interaktivní shell) + `HOME=/home/agent` v prostředí kontejneru,
+stejný token jako host používá živě — čte ho stejné uid (1000), takže žádná
+změna oprávnění na hostu. `Dockerfile.daily` navíc chowne
+`/home/agent/agent-system` na `1000:1000`, jinak zápis
+`bridge_ts_<profil>_claude_stderr.log` (mimo bind-mountnuté `personal/<profil>`)
+padal na `EACCES` pod non-root userem. Ověřeno buildem + testem s fiktivními
+Telegram tokeny, ale reálnými CLI credentials — `claude -p` i všech 5 profilů
+bridge-ts nastartuje `claude` subprocess bez ENOENT/EACCES.
+
+Záměrně MIMO rozsah iterací 1–2 (viz `personal/devops/CLAUDE.md`): napojení na
 `watchdog.sh`/systémový crontab, migrace živého provozu (kontejner se nepouští
 souběžně s hostem na produkčních tokenech — kolidoval by se stejným Telegram
-`getUpdates` long-pollem), Claude CLI autentizace uvnitř kontejneru. Boti nadále
-běží na hostu jako dřív, dokud se explicitně neschválí migrace v pozdější iteraci.
+`getUpdates` long-pollem), mount celého `~/.claude` (jen vybrané 2 soubory, ne
+`settings.json`/`projects/`/atd. — jednodušší, ale při budoucí divergenci
+CLI configu na hostu se to do kontejneru nepropíše). Boti nadále běží na hostu
+jako dřív, dokud se explicitně neschválí migrace v pozdější iteraci.
 
 Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-compose.yml` /
 `app.py` v kořeni repa (echo bot z 16.8., viz `personal/assistant/DECISIONS.md`,

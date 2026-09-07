@@ -29,6 +29,9 @@ services:
       - ./personal/nakup:/home/agent/agent-system/personal/nakup
       # Sdílený token s hostem, read-only — pokud by CLI v kontejneru potřebovalo
       # refresh zapsat, selže (přijatelné pro jednorázový test iterace 2, viz spec).
-      - ${HOME}/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
-      - ${HOME}/.claude.json:/home/agent/.claude.json:ro
+      # Cesta natvrdo (ne ${HOME}) — ta by se při spuštění mimo interaktivní shell
+      # (budoucí watchdog/cron) mohla vyhodnotit prázdná a mount by tiše zmizel
+      # nebo vytvořil prázdný adresář (zjištěno code review).
+      - /home/agent/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
+      - /home/agent/.claude.json:/home/agent/.claude.json:ro
     restart: "no"

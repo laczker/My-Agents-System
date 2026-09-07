@@ -5,10 +5,14 @@
 # a stavové soubory zůstaly ve stejném formátu pro případnou budoucí migraci.
 FROM node:20-slim
 
-# `claude` CLI, stejná verze/instalační cesta jako na hostu (globální npm balíček,
-# ne standalone installer) — bridge-ts (claudeProcess.ts) ho spouští jako subprocess
+# `claude` CLI, připnuté na verzi shodnou s hostem (`claude --version` v době psaní),
+# stejná instalační cesta jako na hostu (globální npm balíček, ne standalone
+# installer) — bridge-ts (claudeProcess.ts) ho spouští jako subprocess
 # `spawn("claude", ...)`, bez něj kontejner padá na ENOENT (zjištěno v iteraci 1).
-RUN npm install -g @anthropic-ai/claude-code
+# Bez pinu by build v jiný den mohl stáhnout novější CLI s jinou sadou/chováním
+# `--stream-json` flagů, než na jaké je claudeProcess.ts psaný — verzi je potřeba
+# ručně bump-nout spolu s ověřením při aktualizaci hostitelského CLI.
+RUN npm install -g @anthropic-ai/claude-code@2.1.233
 
 WORKDIR /home/agent/agent-system/bridge-ts
 COPY bridge-ts/package.json bridge-ts/package-lock.json ./
