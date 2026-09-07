@@ -136,6 +136,18 @@ ale počítat s tím, že po skončení téhle session ho nejpozději do minuty 
 cron watchdog — to je ten mechanismus, který drží všechny ostatní boty naživu napříč
 sessions, ne ruční `nohup`.
 
+**Stejná past u `Agent` toolu s `run_in_background: true`** (incident 7.9., `devops`):
+každá příchozí Telegram zpráva spouští u `bridge-ts` bota novou `claude` invokaci
+(`--resume <session_id>`), ne jeden nekonečně běžící proces — konverzace přežívá
+díky `session_id.txt`, ale sandboxovaná skupina procesů dané invokace skončí, jakmile
+ten tah dokončí odpověď. Subagent zadaný přes `Agent` s `run_in_background: true`
+(čekání na notifikaci "až bude hotovo") běží ve stejné skupině procesů jako hlavní
+tah, takže když bot pošle uživateli mezitýmní zprávu a tah skončí, subagent zemře
+tiše s ním — žádná notifikace nikdy nedorazí, žádná chyba se nezaloguje. Bezpečný
+postup pro delší analýzu/vývoj v `bridge-ts` botovi: spustit ji **synchronně**
+(`run_in_background: false`) v rámci jednoho tahu, i za cenu delšího čekání na
+odpověď, ne spoléhat na to, že dýchá dál mezi Telegram zprávami.
+
 **Výjimka pro dedikované vývojové boty** (první příklad: `fbalbums`, 27.8.): pokud bot
 vyvíjí vlastní produkt (appku), samotný kód produktu **nepatří do `personal/<jméno>/`
 ani do `agent-system` repa vůbec** — jde do vlastního odděleného adresáře/git repa
