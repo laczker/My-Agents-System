@@ -1,4 +1,4 @@
-# DevOps — instrukce agenta
+# DevBot — instrukce agenta
 
 Tenhle adresář je `cwd` pro samostatný proces `bridge-ts` (profil `devops`, vlastní
 Telegram bot, vlastní token v `/home/agent/agent-system/.env.devops`, vlastní

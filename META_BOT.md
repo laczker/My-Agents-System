@@ -11,7 +11,7 @@
 
 ```
                     Uživatel (Telegram, 7 samostatných botů)
-      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup   @FbAlbums   @DevOps
+      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup   @FbAlbums   @DevBot
             │            │            │            │          │         │         │
       ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐┌─▼─────────┐┌─▼─────────┐
       │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │

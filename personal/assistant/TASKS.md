@@ -57,13 +57,13 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   protože stroj má jen ~612 MB volné paměti. Cena: uvnitř skupiny žádná izolace
   (OOM u jednoho denního bota může pořád zatáhnout sousedy ve stejném
   kontejneru/cgroup, viz historický OOM pád zpravodaje). Uživatel 7.9. chtěl
-  tohle řešit dedikovaným vývojovým botem místo tady — viz položka "DevOps bot"
+  tohle řešit dedikovaným vývojovým botem místo tady — viz položka "DevBot"
   v "Hotovo" níž. Další postup (schválení specu první iterace) teď patří do
   `devops` Telegram chatu, ne sem.
 
 ## Hotovo
 
-- **DevOps bot — založen a běží** (7.9.) — uživatel se rozhodl řešit dockerizaci
+- **DevBot — založen a běží** (7.9.) — uživatel se rozhodl řešit dockerizaci
   (a budoucí interní infra práci obecně) přes dedikovaného vývojového bota místo
   přímo v assistant chatu, stejně jako `fbalbums`. Na rozdíl od `fbalbums` (kód
   produktu mimo `agent-system`, viz `META_BOT.md` §2) `devops` pracuje přímo nad
