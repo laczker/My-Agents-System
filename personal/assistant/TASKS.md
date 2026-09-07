@@ -33,12 +33,6 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
   preferuje psané zprávy. Neotevírat znovu bez podnětu od uživatele.
 - **Infra-review agent** — občas projde systém a navrhne vylepšení, může reagovat
   na AI-novinky agenta/zpravodaje. Založit až jako druhý/třetí specialista, ne první.
-- **Programátor bot** (nápad 19.8.) — dedikovaný bot na vývoj/údržbu SW v tomhle
-  systému (např. webovky jako u zpravodaje), který zná tech stack a konvence
-  projektu (viz "web-stack-preference" v paměti: JS/TS, Node, React, bez Cypress).
-  Důvod: včerejší webapp úkol nechaný na zpravodajovi (který k tomu není určený)
-  vedl k OOM pádu; dedikovaný bot by měl nižší spotřebu tokenů (nemusí si dokola
-  domýšlet kontext projektu) a jasnější odpovědnost.
 - **Šablona/podsystém pro jednotlivé SW projekty** (nápad 19.8.) — obecná šablona,
   kterou by "programátor bot" (nebo budoucí meta-bot) použil při zakládání nového
   dílčího bota/podsystému na konkrétní SW projekt — souvisí s "Agent na zakládání
@@ -52,12 +46,42 @@ Formát: stav, krátký popis, co blokuje. Hotové položky se mažou nebo přes
 - **Research bot (opus)** — 24.8.: přesunuto sem z "Čeká na uživatele", uživatel
   zatím nemá co researchovat, žádná pravidla/konvence tedy nejsou k domluvení.
   Beze změny, dokud nepřijde konkrétní podnět.
-- **Programátor bot na interní vývoj** (nápad 19.8., znovu zmíněn 24.8.) — dedikovaný
-  bot na vývoj/údržbu SW v tomhle systému (např. web pro zpravodaje). Zůstává beze
-  změny v "Odloženo" výš, žádný nový detail zatím nepřibyl.
+- **Dockerizace — pilot po 2 kontejnerech místo 1 na bota** (4.9., předáno botovi
+  `devops` 7.9.) — reakce na research dockerizace (viz `DECISIONS.md`): místo
+  kontejneru na každého bota (7) nebo žádného Dockeru navrhnuto rozdělit boty do
+  2 skupin podle rizikového profilu — **denní boti** (assistant, zpravodaj,
+  mailista, joby, nakup; stabilní, na cronu) a **projektoví boti** (fbalbums a
+  budoucí produkty; aktivně se vyvíjí, worktree iterace, vyšší riziko utržené
+  session). Výhoda: izolace mezi skupinami (utržená iterace u projektového bota
+  nesestřelí denní boty) při menším overheadu než 7 kontejnerů — důležité,
+  protože stroj má jen ~612 MB volné paměti. Cena: uvnitř skupiny žádná izolace
+  (OOM u jednoho denního bota může pořád zatáhnout sousedy ve stejném
+  kontejneru/cgroup, viz historický OOM pád zpravodaje). Uživatel 7.9. chtěl
+  tohle řešit dedikovaným vývojovým botem místo tady — viz položka "DevOps bot"
+  v "Hotovo" níž. Další postup (schválení specu první iterace) teď patří do
+  `devops` Telegram chatu, ne sem.
 
 ## Hotovo
 
+- **DevOps bot — založen a běží** (7.9.) — uživatel se rozhodl řešit dockerizaci
+  (a budoucí interní infra práci obecně) přes dedikovaného vývojového bota místo
+  přímo v assistant chatu, stejně jako `fbalbums`. Na rozdíl od `fbalbums` (kód
+  produktu mimo `agent-system`, viz `META_BOT.md` §2) `devops` pracuje přímo nad
+  `agent-system` repem samotným — worktree izolace se otvírá nad ním, ne nad
+  odděleným repem, protože `agent-system` JE ten produkt, který udržuje. Bot
+  založen podle `META_BOT.md` šablony: `personal/devops/CLAUDE.md` (role +
+  stejný vývojový cyklus analytik→vývojář→reviewer→checkpoint jako `fbalbums`,
+  navíc nízká autonomie pro zásah do běžícího procesu jiného bota/crontabu kvůli
+  sdílenému produkčnímu provozu), token v `.env.devops`, zápis do `watchdog.sh`,
+  `META_BOT.md` aktualizován na 7 botů. První zadání: docker pilot (2 kontejnery
+  podle rizikového profilu, denní vs. projektoví boti — spec a zdůvodnění viz
+  položka výše v "Rozpracováno"). Incident při zakládání: ruční `nohup`/
+  `run_in_background` start procesu nepřežil konec zakládací session (sandbox
+  zabije celou skupinu procesů) — zdokumentováno do `META_BOT.md` §2 jako
+  poučení pro příště, watchdog cron (`* * * * *`) proces sám nahodil do minuty a
+  od teď ho drží naživu stejným mechanismem jako ostatních 6 botů. Heartbeat
+  ověřen čerstvý. Od teď další vývoj/rozhodování o docker pilotu i budoucí infra
+  úkoly patří do jeho vlastního Telegram chatu, ne sem.
 - **AI Studio → první produkt FB Albums — bot založen a běží** (25.8.–4.9.) —
   uživatel poslal vlastní vizi (`AI_STUDIO_VIZE.md`), po diskusi ujasněno: nechce
   vyvíjet v assistant chatu ani ručně na vlastním PC, chce dedikovaného bota, co

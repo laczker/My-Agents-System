@@ -52,6 +52,12 @@ if ! pgrep -f "tsx src/index.ts fbalbums" > /dev/null; then
     record_restart "fbalbums" "proces neběžel"
 fi
 
+if ! pgrep -f "tsx src/index.ts devops" > /dev/null; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (devops) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
+    nohup npx tsx src/index.ts devops >> /home/agent/agent-system/bridge_ts_devops.log 2>&1 &
+    record_restart "devops" "proces neběžel"
+fi
+
 if ! pgrep -f "tsx.*personal/dashboard/src/index.ts" > /dev/null; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') dashboard neběží, restartuji" >> /home/agent/agent-system/watchdog.log
     (cd /home/agent/agent-system/personal/dashboard && nohup npx tsx /home/agent/agent-system/personal/dashboard/src/index.ts >> /home/agent/agent-system/dashboard.log 2>&1 &)
