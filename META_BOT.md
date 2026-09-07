@@ -233,6 +233,37 @@ Sdílené (a tedy citlivé — chyba tady zasáhne víc botů najednou):
   (uživatelův preferovaný stack, aby si to uměl sám odladit), ale s vědomím, že
   paměť je tenký zdroj — vyhýbat se trvale běžícím těžkým dev-serverům, kde to jde.
 
+## 4a. Docker pilot — denní boti (od 7.9., `personal/devops`)
+
+Cíl: místo kontejneru pro každého ze 6 botů (moc overheadu na těsné paměti) 2
+kontejnery podle rizikového profilu — stabilní denní boti (assistant, zpravodaj,
+mailista, joby, nakup) v jednom, aktivně vyvíjené projektové boty (fbalbums a
+budoucí produkty) v druhém. `devops` (tenhle bot) zůstává na hostu mimo kontejnery,
+protože potřebuje přístup k dockeru/crontabu/watchdogu napříč strojem.
+
+Iterace 1 (v repu jako `Dockerfile.daily` / `docker-compose.daily.yml` /
+`start-daily.sh` v kořeni repa): obraz + compose pro skupinu denních botů, jen
+ověření mechaniky (build, start 5 `tsx src/index.ts <profil>` procesů v jednom
+kontejneru, čitelnost `heartbeat_ts.txt` přes volume mount). Absolutní cesty
+uvnitř kontejneru zrcadlí hostitelské (`/home/agent/agent-system/...`), takže
+`.env.<profil>` (`BOT_DIR` apod.) fungují beze změny kódu a stavové soubory zůstávají
+ve stejném formátu jako na hostu. Kontejner běží pod `user: "1000:1000"` (stejné
+uid/gid jako hostitelský `agent`), jinak by soubory zapsané bridge-ts do
+bind-mountnutých `personal/<profil>` adresářů skončily na hostu vlastněné rootem.
+`bridge_ts_<profil>_claude_stderr.log` (na rozdíl od heartbeatu) přes volume mount
+zatím čitelný NENÍ — zůstává jen uvnitř kontejneru, řeší se spolu s Claude CLI
+autentizací v pozdější iteraci.
+
+Záměrně MIMO rozsah iterace 1 (viz `personal/devops/CLAUDE.md`): napojení na
+`watchdog.sh`/systémový crontab, migrace živého provozu (kontejner se nepouští
+souběžně s hostem na produkčních tokenech — kolidoval by se stejným Telegram
+`getUpdates` long-pollem), Claude CLI autentizace uvnitř kontejneru. Boti nadále
+běží na hostu jako dřív, dokud se explicitně neschválí migrace v pozdější iteraci.
+
+Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-compose.yml` /
+`app.py` v kořeni repa (echo bot z 16.8., viz `personal/assistant/DECISIONS.md`,
+17.8.) — zůstává ležet beze změny, otázka smazat/nahradit je pořád otevřená.
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním

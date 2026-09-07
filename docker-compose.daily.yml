@@ -1,0 +1,27 @@
+# Docker pilot, iterace 1 (personal/devops/CLAUDE.md) — skupina denních botů
+# (assistant, zpravodaj, mailista, joby, nakup) v jednom kontejneru vedle toho, co
+# běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
+# tahle iterace jen ověřuje mechaniku (build, start, čitelnost stavu přes volume
+# mount), migraci živého provozu řeší až budoucí iterace.
+services:
+  daily-bots:
+    build:
+      context: .
+      dockerfile: Dockerfile.daily
+    # Musí sedět s hostitelským uživatelem (agent, uid/gid 1000) — jinak soubory,
+    # co bridge-ts zapíše do bind-mountnutých personal/<profil> adresářů (heartbeat,
+    # session, fronta...), skončí na hostu vlastněné rootem a host uživatel k nim
+    # ztratí přístup (zjištěno code review, iterace 1).
+    user: "1000:1000"
+    volumes:
+      - ./.env:/home/agent/agent-system/.env:ro
+      - ./.env.zpravodaj:/home/agent/agent-system/.env.zpravodaj:ro
+      - ./.env.mailista:/home/agent/agent-system/.env.mailista:ro
+      - ./.env.joby:/home/agent/agent-system/.env.joby:ro
+      - ./.env.nakup:/home/agent/agent-system/.env.nakup:ro
+      - ./personal/assistant:/home/agent/agent-system/personal/assistant
+      - ./personal/zpravodaj:/home/agent/agent-system/personal/zpravodaj
+      - ./personal/mailista:/home/agent/agent-system/personal/mailista
+      - ./personal/joby:/home/agent/agent-system/personal/joby
+      - ./personal/nakup:/home/agent/agent-system/personal/nakup
+    restart: "no"
