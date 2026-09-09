@@ -107,13 +107,18 @@ CLEANUP_PROGRESS.md (v aktuálním adresáři) a pravidel v CLAUDE.md.
 
 3. Pro každé vlákno rozhodni:
    - čistý marketing/newsletter/notifikace bez akční hodnoty → smaž
-     (trash_thread),
+     (trash_thread) A ZÁROVEŇ unlabel_thread s labelIds=["UNREAD"] (smazané
+     vlákno nesmí zůstat nepřečtené — jinak dál buzí notifikace i v koši),
    - vše ostatní (transakční potvrzení, bezpečnostní upozornění bez otevřené
      akce, staré vyřízené věci, pracovní/školní notifikace) → archivuj
-     (unlabel_thread, odeber label INBOX),
+     (unlabel_thread s labelIds=["INBOX","UNREAD"] v jednom volání),
    - cokoliv skutečně nejasného nebo finančně/bezpečnostně citlivého s
      otevřenou akcí (např. možný únik hesla vyžadující rozhodnutí) → NECH
-     NETKNUTÉ a zapiš do "čeká na rozhodnutí".
+     NETKNUTÉ (nesahej na INBOX ani UNREAD), navíc přidej label_thread
+     s labelIds=["Label_1"] (štítek "K-rozhodnutí") a zapiš do "čeká na
+     rozhodnutí". Nepoužívej nepřečteno jako jediný signál čekání — je
+     křehké (smete ho jakékoliv hromadné označení přečtené) — štítek
+     "K-rozhodnutí" je ta trvalá stopa.
 
 4. Zapiš novou dávku do CLEANUP_PROGRESS.md ve stejném stylu jako dosavadní
    záznamy (číslo dávky, rozsah dat, počty smazáno/archivováno/stranou,
