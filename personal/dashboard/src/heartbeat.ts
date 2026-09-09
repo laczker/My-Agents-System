@@ -7,6 +7,7 @@ export interface BotHeartbeat {
   bot: BotDef;
   status: BotStatus;
   lastSeenTs: number | null;
+  model: string;
 }
 
 function readHeartbeat(dir: string): number | null {
@@ -16,6 +17,20 @@ function readHeartbeat(dir: string): number | null {
     return parsed.ts;
   } catch {
     return null;
+  }
+}
+
+// Stejný default jako CLAUDE_MODEL v bridge-ts/src/config.ts — dokud .env.<profil>
+// hodnotu nepřepíše, bot běží na "sonnet" (CLI default).
+const DEFAULT_MODEL = "sonnet";
+
+function readModel(envFile: string): string {
+  try {
+    const raw = readFileSync(envFile, "utf-8");
+    const match = raw.match(/^CLAUDE_MODEL=["']?([^"'\n]+)["']?/m);
+    return match ? match[1] : DEFAULT_MODEL;
+  } catch {
+    return DEFAULT_MODEL;
   }
 }
 
@@ -31,6 +46,6 @@ export function collectHeartbeats(): BotHeartbeat[] {
     } else {
       status = "running";
     }
-    return { bot, status, lastSeenTs };
+    return { bot, status, lastSeenTs, model: readModel(bot.envFile) };
   });
 }

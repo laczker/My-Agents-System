@@ -69,7 +69,7 @@ function renderPage(range: string): string {
   const botNames = BOTS.map((b) => b.name);
 
   const rows = heartbeats
-    .map(({ bot, status, lastSeenTs }) => {
+    .map(({ bot, status, lastSeenTs, model }) => {
       const restartsToday = restartCountSince(bot.name, dayAgo);
       const proc = readProcessingState(bot);
       const activityCell = proc.isProcessing
@@ -80,6 +80,7 @@ function renderPage(range: string): string {
           <td class="py-2 px-3 font-medium">${bot.name}</td>
           <td class="py-2 px-3 ${STATUS_CLASS[status]}">${STATUS_LABEL[status]}</td>
           <td class="py-2 px-3 text-slate-300">${formatAge(lastSeenTs, now)}</td>
+          <td class="py-2 px-3 text-slate-300">${escapeHtml(model)}</td>
           <td class="py-2 px-3">${activityCell}</td>
           <td class="py-2 px-3 text-slate-300">${restartsToday}</td>
           <td class="py-2 px-3">
@@ -146,6 +147,7 @@ function renderPage(range: string): string {
         <th class="py-2 px-3">Bot</th>
         <th class="py-2 px-3">Stav</th>
         <th class="py-2 px-3">Poslední heartbeat</th>
+        <th class="py-2 px-3">Model</th>
         <th class="py-2 px-3">Právě dělá</th>
         <th class="py-2 px-3">Restartů dnes</th>
         <th class="py-2 px-3"></th>
