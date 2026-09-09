@@ -63,10 +63,13 @@ prioritách, konkrétní implementace přijde postupně:
    vzor pro budoucnost, ne jako aktuální prioritu. Autonomní *odesílání* bez
    schválení zůstává vyloučené (viz `CLAUDE.md`).
 3. **Odhlašování z newsletterů (unsubscribe) u zdroje** — řeší budoucí
-   přítok, ne jen already-doručené (to řeší mazání/archivace). Bere se jako
-   samostatná, prioritní kategorie: identifikovat opakované odesílatele
-   (LinkedIn, jobs.cz, e-shopy...) a odhlásit je — vyžaduje schválení
-   uživatele, protože jde o akci navenek jeho jménem.
+   přítok, ne jen already-doručené (to řeší mazání/archivace). Rozhodnuto
+   (9.9.2026): agent samotné odhlášení **neprovádí** (kliknutí na
+   unsubscribe link je akce navenek, potvrzující aktivní adresu i cizímu
+   serveru). Místo toho jen identifikuje opakované odesílatele
+   marketingu/newsletterů (LinkedIn, jobs.cz, e-shopy...) a označí je
+   vlastním štítkem (kandidát na odhlášení) — odhlášení samotné dělá
+   uživatel ručně.
 4. **Paměť/personalizace per odesílatel** — trvalá pravidla typu "tohohle
    odesílatele vždy archivuj bez ptaní" / "tenhle typ vlákna nikdy nemaž bez
    dotazu", aby se agent nemusel pořád ptát na to samé a triage se
