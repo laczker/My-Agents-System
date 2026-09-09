@@ -1,9 +1,18 @@
-# Docker pilot, iterace 1 (personal/devops/CLAUDE.md) — obraz pro skupinu denních
+# Docker pilot, iterace 1+2 (personal/devops/CLAUDE.md) — obraz pro skupinu denních
 # botů (assistant, zpravodaj, mailista, joby, nakup), co sdílejí bridge-ts engine.
 # Absolutní cesty uvnitř kontejneru zrcadlí hostitelské (/home/agent/agent-system/...),
 # aby .env.<profil> (BOT_DIR apod., viz bridge-ts/src/config.ts) fungovaly beze změny
 # a stavové soubory zůstaly ve stejném formátu pro případnou budoucí migraci.
 FROM node:20-slim
+
+# `claude` CLI, připnuté na verzi shodnou s hostem (`claude --version` v době psaní),
+# stejná instalační cesta jako na hostu (globální npm balíček, ne standalone
+# installer) — bridge-ts (claudeProcess.ts) ho spouští jako subprocess
+# `spawn("claude", ...)`, bez něj kontejner padá na ENOENT (zjištěno v iteraci 1).
+# Bez pinu by build v jiný den mohl stáhnout novější CLI s jinou sadou/chováním
+# `--stream-json` flagů, než na jaké je claudeProcess.ts psaný — verzi je potřeba
+# ručně bump-nout spolu s ověřením při aktualizaci hostitelského CLI.
+RUN npm install -g @anthropic-ai/claude-code@2.1.233
 
 WORKDIR /home/agent/agent-system/bridge-ts
 COPY bridge-ts/package.json bridge-ts/package-lock.json ./
@@ -13,5 +22,13 @@ COPY bridge-ts/src ./src
 
 COPY start-daily.sh /start-daily.sh
 RUN chmod +x /start-daily.sh
+
+# claudeProcess.ts píše `bridge_ts_<profil>_claude_stderr.log` přímo do
+# /home/agent/agent-system/ (mimo bind-mountnuté personal/<profil>), ne do
+# WORKDIR — bez tohohle vlastnictví to pod `user: 1000:1000` (docker-compose.daily.yml)
+# spadne na EACCES při startu (zjištěno testem iterace 2). Logy zůstávají jen
+# v kontejneru (nejsou mountnuté), ztrácí se při `docker compose down`, což je
+# přijatelné pro tenhle pilot — trvalá viditelnost je budoucí práce.
+RUN chown 1000:1000 /home/agent/agent-system
 
 CMD ["/start-daily.sh"]
