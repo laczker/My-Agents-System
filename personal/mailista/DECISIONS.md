@@ -132,3 +132,31 @@ Oprava:
 
 Date:
 2026-09-09
+
+## Přechod z opakovaného nočního probouzení (co 20 min) na jeden běh denně
+
+Historický balast inboxu byl dávno vyčištěný (viz `CLEANUP_PROGRESS.md`,
+stovky dávek se statusem `done`). `nightly_cleanup.sh` ale dál běžel v
+systémovém crontabu co 20 minut mezi půlnocí a 6:00 Praha — což byl vhodný
+rytmus jen dokud se procházel velký historický backlog po dávkách. Po jeho
+dočištění to znamenalo, že se každou noc znovu spustil `NIGHT_MARKER`
+(mazal se ráno spolu s `DONE_MARKER`), a skript pak celou noc znovu a znovu
+(desítky x) volal `claude -p` jen aby zjistil "0 nových vláken, nic k
+zpracování" a zapsal další prázdnou "ověřovací dávku" do
+`CLEANUP_PROGRESS.md` (dávky #200+ jsou skoro výhradně tohle) — zbytečné
+volání navíc bez přínosu. Uživatel (11.9.) to zachytil ("proč tam celou noc
+něco běželo... to teď nechci... chci jen nějak přerozdělovat, ale to stačí
+jednou denně").
+
+Řešení: `nightly_cleanup.sh` přepsán na jeden běh bez okenní/markerové
+logiky (žádný `NIGHT_MARKER`/`DONE_MARKER`/`SUMMARY_MARKER`/ranní
+souhrn příští den) — cron ho teď spouští jen jednou denně (04:00 UTC ≈
+brzy ráno Praha), zpracuje aktuální `is:unread in:inbox` v jedné dávce a
+pošle jeden Telegram souhrn. Když nic nepřišlo, do `CLEANUP_PROGRESS.md`
+se nic nezapisuje (žádné prázdné ověřovací záznamy). Staré marker soubory
+(`.night_marker.txt`, `.night_stats.txt`, `.summary_sent.marker`,
+`.nightly_cleanup_outage.marker`, `.night_done.marker`) smazány jako
+nepoužívané.
+
+Date:
+2026-09-11
