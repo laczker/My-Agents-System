@@ -11,6 +11,11 @@
 # (viz uživatelova zpětná vazba 11.9.: "proč tam celou noc něco běželo... to
 # teď nechci... chci jen nějak přerozdělovat, ale to stačí jednou denně").
 #
+# Třídění je od 15.9. pětikategoriové (viz DECISIONS.md), ne binární
+# smaž/archivuj — mazání je vzácná akce jen pro odesílatele explicitně
+# uvedené v spam_senders.txt, nejistý marketing (LinkedIn apod.) se jen
+# štítkuje a archivuje, aby ho uživatel mohl sám prolistovat.
+#
 # Telegram zprávy: přesně jedna po doběhnutí dávky se souhrnem, plus okamžitá
 # eskalace, pokud dávka najde něco, co potřebuje rozhodnutí hned. Při selhání
 # jedna varovná zpráva, žádné automatické opakování do rána (další pokus je
@@ -49,9 +54,18 @@ send_telegram() {
 
 PROMPT=$(cat <<'EOF'
 Proveď jednu denní dávku třídění inboxu podle pravidel v CLAUDE.md a
-DECISIONS.md. Historický balast je už dávno vyčištěný (viz
-CLEANUP_PROGRESS.md, status "done") — tahle dávka zpracovává jen to, co je
-teď aktuálně nepřečtené v inboxu.
+DECISIONS.md (zápis 15.9. — pět kategorií, ne binární smaž/archivuj).
+Historický balast je už dávno vyčištěný (viz CLEANUP_PROGRESS.md, status
+"done") — tahle dávka zpracovává jen to, co je teď aktuálně nepřečtené v
+inboxu.
+
+0. Přečti si spam_senders.txt v tomhle adresáři (seznam odesílatelů/domén,
+   které uživatel výslovně označil jako "nikdy nechci vidět" — řádky
+   začínající # jsou komentář). Ověř přes mcp__claude_ai_Gmail__list_labels,
+   jestli existují štítky "K přečtení", "Účty a objednávky" a "Kandidát na
+   odhlášení" — pokud ne, vytvoř je přes create_label a zapamatuj si jejich
+   ID pro tuhle dávku. Štítek "K-rozhodnutí" má ověřené ID Label_1 (nemusíš
+   hledat znovu).
 
 1. Spusť mcp__claude_ai_Gmail__search_threads s dotazem `is:unread in:inbox`,
    vezmi až 200 vláken z výsledku.
@@ -60,31 +74,44 @@ teď aktuálně nepřečtené v inboxu.
    (viz níž) s nulami — NEPIŠ žádný záznam do CLEANUP_PROGRESS.md (žádná
    "ověřovací dávka", jen ticho, když není co dělat).
 
-3. Pro každé vlákno rozhodni:
-   - čistý marketing/newsletter/notifikace bez akční hodnoty → smaž
-     (trash_thread) A ZÁROVEŇ unlabel_thread s labelIds=["UNREAD"],
-   - vše ostatní (transakční potvrzení, bezpečnostní upozornění bez otevřené
-     akce, staré vyřízené věci, pracovní/školní notifikace) → archivuj
-     (unlabel_thread s labelIds=["INBOX","UNREAD"] v jednom volání),
-   - cokoliv skutečně nejasného nebo finančně/bezpečnostně citlivého s
-     otevřenou akcí → NECH NETKNUTÉ (nesahej na INBOX ani UNREAD), navíc
-     přidej label_thread s labelIds=["Label_1"] (štítek "K-rozhodnutí"),
-   - opakovaný marketingový odesílatel bez jasného unsubscribe → jen
-     označ jako kandidáta na odhlášení (podle DECISIONS.md), samotné
-     kliknutí na odhlášení dělá uživatel ručně.
+3. Pro každé vlákno rozhodni PRÁVĚ JEDNU primární kategorii:
+   - **Čistý spam** (jen když odesílatel/doména JE na seznamu ze spam_senders.txt)
+     → smaž (trash_thread) A ZÁROVEŇ unlabel_thread s labelIds=["UNREAD"].
+   - **K rozhodnutí** — cokoliv skutečně nejasného nebo finančně/bezpečnostně
+     citlivého s otevřenou akcí → NECH NETKNUTÉ (nesahej na INBOX ani
+     UNREAD), navíc label_thread s labelIds=["Label_1"].
+   - **Účty a objednávky** — transakční potvrzení, rezervace, e-shopy
+     (Rohlík, Setmore, Ryanair apod.) → archivuj (unlabel_thread s
+     labelIds=["INBOX","UNREAD"]) a přidej štítek "Účty a objednávky".
+   - **K přečtení** — VŠECHNO OSTATNÍ, včetně marketingu/newsletterů/
+     notifikací od odesílatelů, kteří NEJSOU na spam_senders.txt (typicky
+     LinkedIn, pracovní/školní notifikace, obecné newslettery) → archivuj
+     (unlabel_thread s labelIds=["INBOX","UNREAD"]) a přidej štítek
+     "K přečtení". DŮLEŽITÉ: dokud odesílatel není výslovně na
+     spam_senders.txt, nikdy nemaž jen na základě toho, že vlákno "vypadá
+     jako marketing" — jde do K přečtení, ne do koše.
+
+   Navíc (nezávisle na primární kategorii výš): pokud je odesílatel
+   opakovaný marketingový/newsletterový zdroj bez jasného unsubscribe a
+   ještě nemá štítek "Kandidát na odhlášení", přidej mu ho navíc k primární
+   kategorii (typicky spolu s "K přečtení"). Jde jen o štítek — žádné
+   klikání na unsubscribe odkaz, to dělá uživatel ručně.
 
 4. Pokud jsi v kroku 3 něco zpracoval (tj. výsledek nebyl 0 vláken), připiš
-   stručný záznam dávky do CLEANUP_PROGRESS.md (datum, počty
-   smazáno/archivováno/stranou).
+   stručný záznam dávky do CLEANUP_PROGRESS.md (datum, počty po
+   kategoriích).
 
 5. Pokud najdeš něco, co je potřeba hned eskalovat uživateli (bezpečnostní/
-   finanční rozhodnutí, ne jen běžné "ponechat stranou"), přidej PŘED
+   finanční rozhodnutí, ne jen běžné "K rozhodnutí"), přidej PŘED
    posledním řádkem výstupu jeden nebo víc řádků přesně ve tvaru:
    ESCALATE: <krátký česky popis, jedna věta>
 
 Úplně poslední řádek výstupu (nic za ním) musí být přesně ve tvaru:
-BATCH_RESULT: deleted=<N> archived=<M> pending=<P>
+BATCH_RESULT: deleted=<N> accounts=<M> toread=<R> pending=<P> unsubscribe=<U>
 
+kde deleted=Čistý spam, accounts=Účty a objednávky, toread=K přečtení,
+pending=K rozhodnutí, unsubscribe=kolik vláken navíc dostalo štítek
+"Kandidát na odhlášení" (podmnožina toread/accounts, ne samostatná kategorie).
 Nic jiného na závěr nepiš.
 EOF
 )
@@ -106,16 +133,24 @@ fi
 
 RESULT_LINE=$(echo "$OUTPUT" | grep '^BATCH_RESULT:' | tail -1)
 DEL=$(echo "$RESULT_LINE" | sed -n 's/.*deleted=\([0-9]*\).*/\1/p')
-ARCH=$(echo "$RESULT_LINE" | sed -n 's/.*archived=\([0-9]*\).*/\1/p')
+ACC=$(echo "$RESULT_LINE" | sed -n 's/.*accounts=\([0-9]*\).*/\1/p')
+TOREAD=$(echo "$RESULT_LINE" | sed -n 's/.*toread=\([0-9]*\).*/\1/p')
 PEND=$(echo "$RESULT_LINE" | sed -n 's/.*pending=\([0-9]*\).*/\1/p')
+UNSUB=$(echo "$RESULT_LINE" | sed -n 's/.*unsubscribe=\([0-9]*\).*/\1/p')
 [ -z "$DEL" ] && DEL=0
-[ -z "$ARCH" ] && ARCH=0
+[ -z "$ACC" ] && ACC=0
+[ -z "$TOREAD" ] && TOREAD=0
 [ -z "$PEND" ] && PEND=0
+[ -z "$UNSUB" ] && UNSUB=0
 
-log "OK deleted=$DEL archived=$ARCH pending=$PEND"
+log "OK deleted=$DEL accounts=$ACC toread=$TOREAD pending=$PEND unsubscribe=$UNSUB"
 
-if [ "$DEL" = "0" ] && [ "$ARCH" = "0" ] && [ "$PEND" = "0" ]; then
+if [ "$DEL" = "0" ] && [ "$ACC" = "0" ] && [ "$TOREAD" = "0" ] && [ "$PEND" = "0" ]; then
   send_telegram "✅ Denní třídění inboxu: nic nového k roztřídění."
 else
-  send_telegram "✅ Denní třídění inboxu: smazáno ${DEL}, archivováno ${ARCH}, ponecháno k rozhodnutí ${PEND}."
+  MSG="✅ Denní třídění inboxu: 📰 K přečtení ${TOREAD}, 🛒 Účty a objednávky ${ACC}, 🗑️ smazáno ${DEL}, ⚠️ k rozhodnutí ${PEND}."
+  if [ "$UNSUB" != "0" ]; then
+    MSG="${MSG} (z toho 🔕 kandidát na odhlášení: ${UNSUB})"
+  fi
+  send_telegram "$MSG"
 fi

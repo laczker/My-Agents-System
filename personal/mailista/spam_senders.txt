@@ -1,0 +1,7 @@
+# Seznam odesílatelů (e-mail nebo doména), které uživatel výslovně označil
+# jako "nikdy nechci vidět" — jen tihle spadají do kategorie "Čistý spam"
+# (mazání). Viz DECISIONS.md 15.9.2026.
+#
+# Přidávat sem smí jen na základě výslovného uživatelova zadání, ne na
+# základě vlastního úsudku agenta o obsahu mailu. Jeden záznam na řádek,
+# # na začátku řádku = komentář.

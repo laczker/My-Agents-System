@@ -133,6 +133,59 @@ Oprava:
 Date:
 2026-09-09
 
+## Náhrada binárního smaž/archivuj pěti kategoriemi (štítky místo mazání u nejistých případů)
+
+Co se stalo:
+Uživatel (15.9.) upozornil, že dosavadní pravidlo "čistý marketing/newsletter →
+smaž" mazalo i věci, které chce číst (typicky LinkedIn) — "budeme si muset
+nastavit pravidla... rovnou mažeš všechno a to se mi nelíbí... myslel jsem, že
+jsme se dohodli, že budeš rozřazovat". Domluvili jsme se na páteru kategorií,
+kde nic hodnotného nezmizí bez lidského pohledu:
+
+1. **📰 K přečtení** — LinkedIn, newslettery a podobné, co uživatel chce
+   občas prolistovat → jen štítek, mail zůstává v archivu (INBOX+UNREAD
+   strženo, nic se nemaže). Uživatel si to sám projde a smaže/archivuje.
+2. **🛒 Účty a objednávky** — transakční potvrzení, rezervace, e-shopy
+   (Rohlík, Setmore, Ryanair apod.) → archivovat (beze změny oproti
+   dřívějšímu pravidlu).
+3. **🗑️ Čistý spam** — smaže se rovnou (`trash_thread` + strhnutí UNREAD),
+   ale **jen pro odesílatele, které uživatel explicitně označil jako "nikdy
+   nechci vidět"** (viz `spam_senders.txt` — start prázdný). Rozhodnuto
+   (15.9.): hranice mezi "K přečtení" a "Čistý spam" NENÍ podle obsahu
+   (např. LinkedIn pozvánka vs. LinkedIn reklama), ale podle odesílatele —
+   dokud odesílatel není na seznamu, jde jeho pošta do "K přečtení", ne do
+   mazání. To je záměrně konzervativní: bez seznamu se dnes nesmaže nic
+   automaticky jen na základě "vypadá to jako marketing".
+4. **⚠️ K rozhodnutí** — beze změny, `Label_1`, finanční/bezpečnostní/
+   nejasné, ponechat netknuté (viz zápis 9.9.).
+5. **🔕 Kandidát na odhlášení** — opakovaný odesílatel marketingu/
+   newsletteru bez jasného unsubscribe → JEN štítek navíc k primární
+   kategorii výš (typicky "K přečtení"), žádná další akce. Uživatel (15.9.)
+   potvrdil, že stačí štítek v Gmailu, který si sám prolistuje — ne týdenní
+   seznam do Telegramu.
+
+`spam_senders.txt` v tomhle adresáři: prostý seznam e-mailových adres/domén,
+které uživatel výslovně označil za "nikdy nechci vidět" — start prázdný.
+Jediný způsob, jak se tam něco dostane, je uživatelovo výslovné zadání (přes
+Telegram mailistovi, nebo přímou úpravou souboru); agent si tam sám nic
+nepřidává na základě vlastního úsudku o obsahu.
+
+Štítky `K přečtení`, `Účty a objednávky`, `Kandidát na odhlášení` v Gmailu
+zatím nemají ověřené ID — musí je vytvořit/najít až běh s funkční Gmail
+autorizací (v týhle konverzaci OAuth zrovna vypršel, viz log). `nightly_cleanup.sh`
+proto při každém běhu nejdřív ověří přes `list_labels`, jestli existují, a
+pokud ne, vytvoří je přes `create_label` — nespoléhá na natvrdo zapsané ID
+(na rozdíl od `K-rozhodnutí` = `Label_1`, které je už ověřené ze zápisu 9.9.).
+
+Why:
+Binární smaž/archivuj předpokládalo, že "vypadá jako marketing" ⇒ "nikdo to
+nechce vidět", což neplatí (LinkedIn). Řešení dělá mazání vzácnou, výslovně
+schválenou akcí (per odesílatel), a defaultní cesta pro nejistý marketing je
+neškodná (štítek + archiv), ne nevratná.
+
+Date:
+2026-09-15
+
 ## Přechod z opakovaného nočního probouzení (co 20 min) na jeden běh denně
 
 Historický balast inboxu byl dávno vyčištěný (viz `CLEANUP_PROGRESS.md`,
