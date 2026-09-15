@@ -27,6 +27,11 @@ services:
       - ./personal/mailista:/home/agent/agent-system/personal/mailista
       - ./personal/joby:/home/agent/agent-system/personal/joby
       - ./personal/nakup:/home/agent/agent-system/personal/nakup
+      # Read-write (ne :ro) — assistant uvnitř kontejneru musí umět tyhle dokumenty
+      # i zapisovat při architektonických změnách (personal/assistant/CLAUDE.md),
+      # ne jen číst. Iterace 3 (personal/devops/CLAUDE.md).
+      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md
+      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md
       # Sdílený token s hostem, read-only — pokud by CLI v kontejneru potřebovalo
       # refresh zapsat, selže (přijatelné pro jednorázový test iterace 2, viz spec).
       # Cesta natvrdo (ne ${HOME}) — ta by se při spuštění mimo interaktivní shell
