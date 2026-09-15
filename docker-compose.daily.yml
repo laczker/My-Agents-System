@@ -1,8 +1,9 @@
-# Docker pilot, iterace 1+2 (personal/devops/CLAUDE.md) — skupina denních botů
+# Docker pilot, iterace 1+2+3 (personal/devops/CLAUDE.md) — skupina denních botů
 # (assistant, zpravodaj, mailista, joby, nakup) v jednom kontejneru vedle toho, co
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
 # tahle iterace jen ověřuje mechaniku (build, start, čitelnost stavu přes volume
-# mount, claude CLI auth), migraci živého provozu řeší až budoucí iterace.
+# mount, claude CLI auth, sdílené dokumenty), migraci živého provozu řeší až
+# budoucí iterace.
 services:
   daily-bots:
     build:
@@ -27,11 +28,13 @@ services:
       - ./personal/mailista:/home/agent/agent-system/personal/mailista
       - ./personal/joby:/home/agent/agent-system/personal/joby
       - ./personal/nakup:/home/agent/agent-system/personal/nakup
-      # Read-write (ne :ro) — assistant uvnitř kontejneru musí umět tyhle dokumenty
-      # i zapisovat při architektonických změnách (personal/assistant/CLAUDE.md),
-      # ne jen číst. Iterace 3 (personal/devops/CLAUDE.md).
-      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md
-      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md
+      # Read-only — code review iterace 3 ukázal, že rw mount jednotlivého souboru
+      # nefunguje spolehlivě (Linux bind mount je vázaný na inode, ne na cestu;
+      # `Edit` nástroj píše přes tmp+rename, takže zápis skončí na novém inode,
+      # co bind mount vůbec nevidí). Skutečné rw řešení (adresářový mount) je
+      # samostatná budoucí položka, viz TASKS.md.
+      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
+      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
       # Sdílený token s hostem, read-only — pokud by CLI v kontejneru potřebovalo
       # refresh zapsat, selže (přijatelné pro jednorázový test iterace 2, viz spec).
       # Cesta natvrdo (ne ${HOME}) — ta by se při spuštění mimo interaktivní shell
