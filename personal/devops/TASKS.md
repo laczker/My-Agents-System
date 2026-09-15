@@ -13,10 +13,11 @@ v `META_BOT.md` §4a.
 
 Strukturální oprava: přesunout oba soubory do vlastního adresáře (stejný
 vzor jako `personal/<profil>`) a mountovat ten adresář jako celek — adresářový
-mount vidí živý obsah, přežije i rename uvnitř. Rozsah zjištěný 15.9.: dotkne
-se `bridge-ts/src/claudeProcess.ts` (hardcoded cesta) a >10 dalších
-`CLAUDE.md`/`DECISIONS.md` napříč boty, co na soubory odkazují jménem — proto
-samostatná budoucí iterace se svým vlastním specem, ne součást iterace 3.
+mount vidí živý obsah, přežije i rename uvnitř. Rozsah zjištěný 15.9. (ověřeno
+grepem): žádná cesta v `bridge-ts/src` na tyhle 2 soubory natvrdo neodkazuje,
+takže kód se nedotkne; dotkne se ale 9 dalších `CLAUDE.md`/`DECISIONS.md`
+napříč boty, co na soubory odkazují jménem (bez cesty) — proto samostatná
+budoucí iterace se svým vlastním specem, ne součást iterace 3.
 
 Dokud nevyřešeno: assistant (a kdokoliv jiný) uvnitř kontejneru nemůže
 `META_BOT.md`/`ARCHITEKTURA.md` upravovat — architektonické změny, co CLAUDE.md
