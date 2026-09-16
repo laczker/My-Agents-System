@@ -303,13 +303,28 @@ kontejnerového zápisu výše tohle budoucí adresářový mount (`TASKS.md`) s
 sebe vyřeší (mount vázaný na adresář, ne na konkrétní soubor, vidí živý obsah
 adresáře při každém přístupu).
 
-Záměrně MIMO rozsah iterací 1–3 (viz `personal/devbot/CLAUDE.md`): napojení na
-`watchdog.sh`/systémový crontab, migrace živého provozu (kontejner se nepouští
-souběžně s hostem na produkčních tokenech — kolidoval by se stejným Telegram
-`getUpdates` long-pollem), mount celého `~/.claude` (jen vybrané 2 soubory, ne
-`settings.json`/`projects/`/atd. — jednodušší, ale při budoucí divergenci
-CLI configu na hostu se to do kontejneru nepropíše). Boti nadále běží na hostu
-jako dřív, dokud se explicitně neschválí migrace v pozdější iteraci.
+Iterace 4 (`watchdog.sh`): přidána schopnost zjistit, jestli kontejner
+`daily-bots` běží (`docker compose -f docker-compose.daily.yml ps --status
+running --services`), a pokud ne, restartovat ho (`docker compose ... up -d`)
++ zalogovat přes `record_restart`, stejnou konvencí jako dnešní `pgrep`/`nohup`
+bloky pro holé procesy. Detekce ověřena reálným testem (kontejner nastartovaný
+s náhradním `sleep infinity` příkazem místo `bridge-ts`, aby test nezávisel na
+platných Telegram tokenech — viz iterace 1–2 výše, funkční start s fiktivními
+tokeny end-to-end zatím ověřen nebyl, `grammy` na neplatném tokenu skončí
+chybou a kontejner spadne). Kód je **záměrně zakomentovaný**, ne zapojený do
+minutového cronu: dokud hostové `pgrep`/`nohup` bloky pro denní boty běží dál
+(cutover ještě neproběhl), by automatický `up -d` mohl kontejner nastartovat
+se skutečnými tokeny souběžně s hostovým procesem téhož bota → kolize stejného
+Telegram `getUpdates` long-pollu. Aktivace (odkomentovat + zároveň vypnout
+odpovídající hostové bloky) je otevřená položka, viz `personal/devbot/TASKS.md`.
+
+Záměrně MIMO rozsah iterací 1–4 (viz `personal/devbot/CLAUDE.md`): migrace
+živého provozu (kontejner se nepouští souběžně s hostem na produkčních
+tokenech — kolidoval by se stejným Telegram `getUpdates` long-pollem), mount
+celého `~/.claude` (jen vybrané 2 soubory, ne `settings.json`/`projects/`/atd.
+— jednodušší, ale při budoucí divergenci CLI configu na hostu se to do
+kontejneru nepropíše). Boti nadále běží na hostu jako dřív, dokud se explicitně
+neschválí migrace v pozdější iteraci.
 
 Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-compose.yml` /
 `app.py` v kořeni repa (echo bot z 16.8., viz `personal/assistant/DECISIONS.md`,
