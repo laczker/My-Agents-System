@@ -68,17 +68,14 @@ if ! pgrep -f "tsx.*/personal/zpravodaj/webapp/server/src/index.ts$" > /dev/null
     (cd /home/agent/agent-system/personal/zpravodaj/webapp/server && nohup npx tsx /home/agent/agent-system/personal/zpravodaj/webapp/server/src/index.ts >> /home/agent/agent-system/zpravodaj_webapp.log 2>&1 &)
 fi
 
-# Denní Docker kontejner (docker-compose.daily.yml, Docker pilot iterace 1-3) —
-# schopnost hlídat/restartovat kontejner přidána v iteraci 4, ale ZÁMĚRNĚ
-# zakomentovaná: hostové bloky výš pro assistant/zpravodaj/mailista/joby/nakup
-# běží dál a hlídají tytéž boty. Dokud neproběhne domluvený cutover (vypnutí
-# hostových procesů), automatický `up -d` by mohl kontejner nastartovat se
-# skutečnými tokeny souběžně s hostovým procesem téhož bota → kolize Telegram
-# getUpdates long-pollu (META_BOT.md §4a). Aktivace (odkomentovat + zároveň
-# vypnout odpovídající hostové bloky výš) je otevřená položka v
-# personal/devbot/TASKS.md, řeší se jako vlastní budoucí iterace.
+# Denní Docker kontejner (docker-compose.daily.yml) — Docker pilot iterace 4.
+# Záměrně zakomentováno, důvod a aktivační postup viz META_BOT.md §4a a
+# personal/devbot/TASKS.md ("Aktivace watchdog restartu kontejneru v cronu").
 #
-# if ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services | grep -q "^daily-bots$"; then
+# compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
+# if [ $? -ne 0 ]; then
+#     echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
+# elif ! echo "$compose_ps_output" | grep -q "^daily-bots$"; then
 #     echo "$(date '+%Y-%m-%d %H:%M:%S') daily-bots kontejner neběží, restartuji" >> /home/agent/agent-system/watchdog.log
 #     (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d) >> /home/agent/agent-system/watchdog.log 2>&1
 #     record_restart "daily-bots-container" "kontejner neběžel"
