@@ -3,7 +3,7 @@
 > Doplňuje `ARCHITEKTURA.md` (sekce 10 „Orchestrator”, sekce 13 „Persistent context”).
 > Tam je původní záměr/vize, tady je **jak systém reálně funguje ke dni 2026-09-07**
 > a jaké konvence si dosavadní boti (assistant, zpravodaj, mailista, joby, nakup,
-> fbalbums, devops) postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a
+> fbalbums, devbot) postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a
 > spouštět další boty, má tenhle soubor přečíst jako první — ušetří to
 > znovuobjevování stejných pravidel přes stejné incidenty.
 
@@ -15,9 +15,9 @@
             │            │            │            │          │         │         │
       ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐┌─▼─────────┐┌─▼─────────┐
       │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
-      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  ││ (fbalbums)││ (devops)  │
+      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  ││ (fbalbums)││ (devbot)  │
       │cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal│
-      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    ││ /fbalbums/ ││ /devops/   │
+      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    ││ /fbalbums/ ││ /devbot/   │
       └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
                     │  vlastní .env.<bot> token, vlastní
                     │  claude proces (stream-json, trvalý)
@@ -33,7 +33,7 @@
 
   watchdog.sh (systémový cron, každou minutu)
     hlídá heartbeat/pgrep 8 procesů: assistant, zpravodaj, mailista, joby, nakup,
-    fbalbums, devops, dashboard → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
+    fbalbums, devbot, dashboard → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
 
   personal/dashboard/ (5. proces, čtecí web, Tailscale 100.108.179.97:8765)
     - stav botů (heartbeat), aktivita 24h, kvóta, log proklik, restart tlačítko
@@ -125,7 +125,7 @@ Každý bot = vlastní adresář `personal/<jméno>/`:
 - záznam v `watchdog.sh` (host-level cron skript, mimo `personal/`) — bez něj bota
   nikdo nenahodí po pádu
 
-**První nastartování procesu** (incident 7.9., zakládání `devops`): uvnitř sandboxované
+**První nastartování procesu** (incident 7.9., zakládání `devbot`): uvnitř sandboxované
 agent session ručně spuštěný proces (`nohup ... &`, `disown`, i Bash tool
 `run_in_background: true`) **nepřežije konec/teardown té session** — sandbox zabíjí
 celou skupinu procesů, i když vypadají jako odpojené. Nespoléhat na to, že ruční start
@@ -136,7 +136,7 @@ ale počítat s tím, že po skončení téhle session ho nejpozději do minuty 
 cron watchdog — to je ten mechanismus, který drží všechny ostatní boty naživu napříč
 sessions, ne ruční `nohup`.
 
-**Stejná past u `Agent` toolu s `run_in_background: true`** (incident 7.9., `devops`):
+**Stejná past u `Agent` toolu s `run_in_background: true`** (incident 7.9., `devbot`):
 každá příchozí Telegram zpráva spouští u `bridge-ts` bota novou `claude` invokaci
 (`--resume <session_id>`), ne jeden nekonečně běžící proces — konverzace přežívá
 díky `session_id.txt`, ale sandboxovaná skupina procesů dané invokace skončí, jakmile
@@ -157,14 +157,14 @@ takového bota zůstává jen jeho provozní domov (instrukce, stav, Telegram) �
 izolace pro jednotlivé iterace (`EnterWorktree`/`ExitWorktree`) se otvírá nad tím
 odděleným produktovým repem, ne nad `agent-system`.
 
-**Výjimka opačným směrem** (`devops`, 7.9.): dedikovaný bot na interní vývoj/infra
+**Výjimka opačným směrem** (`devbot`, 7.9.): dedikovaný bot na interní vývoj/infra
 *samotného* `agent-system` pracuje přímo nad `agent-system` repem — žádný oddělený
 produktový repo tu nedává smysl, protože `agent-system` JE ten produkt, který
 udržuje. Worktree izolace pro jeho iterace se tedy otvírá nad `/home/agent/agent-system`
 samotným, ne nad odděleným adresářem — na rozdíl od `fbalbums` výš. Riziko je vyšší
 (sahá na repo, ze kterého běží živě zbytek produkčního provozu), proto má navíc
 nízkou autonomii pro cokoliv, co by restartovalo/zastavilo proces jiného bota nebo
-zasáhlo do sdíleného crontabu (viz `personal/devops/CLAUDE.md`).
+zasáhlo do sdíleného crontabu (viz `personal/devbot/CLAUDE.md`).
 
 ## 2a. Přiřazování modelu botovi/subagentovi
 
@@ -173,7 +173,7 @@ Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
 podle úkolu uvnitř jednoho bota, stejný vzor, jaký používá Ludwigův bridge.
 Pravidlo pro volbu při zakládání bota:
 - **`sonnet` (default)** — běžný bot s průběžnou konverzací/rozhodováním
-  (assistant, zpravodaj, mailista, joby, nakup, fbalbums, devops, budoucí
+  (assistant, zpravodaj, mailista, joby, nakup, fbalbums, devbot, budoucí
   finanční/jazykový bot).
   Neměnit bez konkrétního důvodu (kvalita rozhodování u citlivých úkolů, např.
   mailista maže/archivuje maily, jde o data).
@@ -245,12 +245,12 @@ Sdílené (a tedy citlivé — chyba tady zasáhne víc botů najednou):
   (uživatelův preferovaný stack, aby si to uměl sám odladit), ale s vědomím, že
   paměť je tenký zdroj — vyhýbat se trvale běžícím těžkým dev-serverům, kde to jde.
 
-## 4a. Docker pilot — denní boti (od 7.9., `personal/devops`)
+## 4a. Docker pilot — denní boti (od 7.9., `personal/devbot`)
 
 Cíl: místo kontejneru pro každého ze 6 botů (moc overheadu na těsné paměti) 2
 kontejnery podle rizikového profilu — stabilní denní boti (assistant, zpravodaj,
 mailista, joby, nakup) v jednom, aktivně vyvíjené projektové boty (fbalbums a
-budoucí produkty) v druhém. `devops` (tenhle bot) zůstává na hostu mimo kontejnery,
+budoucí produkty) v druhém. `devbot` (tenhle bot) zůstává na hostu mimo kontejnery,
 protože potřebuje přístup k dockeru/crontabu/watchdogu napříč strojem.
 
 Iterace 1 (v repu jako `Dockerfile.daily` / `docker-compose.daily.yml` /
@@ -281,7 +281,7 @@ padal na `EACCES` pod non-root userem. Ověřeno buildem + testem s fiktivními
 Telegram tokeny, ale reálnými CLI credentials — `claude -p` i všech 5 profilů
 bridge-ts nastartuje `claude` subprocess bez ENOENT/EACCES.
 
-Záměrně MIMO rozsah iterací 1–2 (viz `personal/devops/CLAUDE.md`): napojení na
+Záměrně MIMO rozsah iterací 1–2 (viz `personal/devbot/CLAUDE.md`): napojení na
 `watchdog.sh`/systémový crontab, migrace živého provozu (kontejner se nepouští
 souběžně s hostem na produkčních tokenech — kolidoval by se stejným Telegram
 `getUpdates` long-pollem), mount celého `~/.claude` (jen vybrané 2 soubory, ne

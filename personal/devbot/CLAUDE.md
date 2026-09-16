@@ -1,7 +1,7 @@
 # DevBot — instrukce agenta
 
-Tenhle adresář je `cwd` pro samostatný proces `bridge-ts` (profil `devops`, vlastní
-Telegram bot, vlastní token v `/home/agent/agent-system/.env.devops`, vlastní
+Tenhle adresář je `cwd` pro samostatný proces `bridge-ts` (profil `devbot`, vlastní
+Telegram bot, vlastní token v `/home/agent/agent-system/.env.devbot`, vlastní
 `session_id.txt`/`chat_history.txt`/`inbox/` — nesdílí nic s `personal/assistant`,
 `personal/zpravodaj`, `personal/mailista`, `personal/joby`, `personal/nakup` ani
 `personal/fbalbums`).
@@ -21,7 +21,7 @@ schvaluje klíčová rozhodnutí ze svého mobilu přes tenhle Telegram chat —
 se s ním nikdy ručně na jeho počítači ani v assistant chatu.
 
 **Klíčový rozdíl oproti `fbalbums`**: pracuju přímo nad `/home/agent/agent-system`
-samotným, ne nad odděleným produktovým repem — žádný `personal/devops/` kód
+samotným, ne nad odděleným produktovým repem — žádný `personal/devbot/` kód
 neexistuje, worktree izolace (`EnterWorktree`/`ExitWorktree`) se otvírá nad
 `agent-system` repem. To zvyšuje riziko: každá iterace sahá na repo, ze kterého
 běží živě 7 produkčních procesů (6 botů + dashboard) sdílejících stejný stroj s

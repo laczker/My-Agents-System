@@ -1,6 +1,6 @@
 #!/bin/sh
 # Spustí bridge-ts pro všech 5 denních botů v jednom kontejneru (Docker pilot,
-# iterace 1 — 2 kontejnery místo 1-na-bota, viz personal/devops/CLAUDE.md).
+# iterace 1 — 2 kontejnery místo 1-na-bota, viz personal/devbot/CLAUDE.md).
 # "assistant" je profil bez argumentu (zpětná kompatibilita, viz config.ts).
 # SIGTERM/SIGINT se přepošle všem dětem, ať `docker compose stop`/`down` ukončí
 # i podprocesy čistě místo osiřelých `claude` subprocessů.

@@ -1,4 +1,4 @@
-# Docker pilot, iterace 1+2 (personal/devops/CLAUDE.md) — obraz pro skupinu denních
+# Docker pilot, iterace 1+2 (personal/devbot/CLAUDE.md) — obraz pro skupinu denních
 # botů (assistant, zpravodaj, mailista, joby, nakup), co sdílejí bridge-ts engine.
 # Absolutní cesty uvnitř kontejneru zrcadlí hostitelské (/home/agent/agent-system/...),
 # aby .env.<profil> (BOT_DIR apod., viz bridge-ts/src/config.ts) fungovaly beze změny

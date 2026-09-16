@@ -1,4 +1,4 @@
-# Docker pilot, iterace 1+2 (personal/devops/CLAUDE.md) — skupina denních botů
+# Docker pilot, iterace 1+2 (personal/devbot/CLAUDE.md) — skupina denních botů
 # (assistant, zpravodaj, mailista, joby, nakup) v jednom kontejneru vedle toho, co
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
 # tahle iterace jen ověřuje mechaniku (build, start, čitelnost stavu přes volume
