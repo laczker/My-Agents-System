@@ -22,3 +22,20 @@ budoucí iterace se svým vlastním specem, ne součást iterace 3.
 Dokud nevyřešeno: assistant (a kdokoliv jiný) uvnitř kontejneru nemůže
 `META_BOT.md`/`ARCHITEKTURA.md` upravovat — architektonické změny, co CLAUDE.md
 ukládá zapisovat do těchto souborů, musí probíhat na hostu, ne v kontejneru.
+
+### Aktivace watchdog restartu kontejneru v cronu (zjištěno 16.9., iterace 4)
+
+Iterace 4 přidává do `watchdog.sh` schopnost hlídat/restartovat denní Docker
+kontejner (`docker compose up -d`), ale záměrně ji nezapojuje do automatického
+minutového cronu — jen ověřeno ručně. Důvod: dokud kontejner neběží naostro
+místo hostových procesů (cutover ještě neproběhl), automatický restart by
+mohl kontejner nastartovat se skutečnými tokeny souběžně s běžícím hostovým
+procesem téhož bota → kolize Telegram `getUpdates` long-pollu (viz `META_BOT.md`
+§4a).
+
+Až bude domluvený cutover na kontejner (host procesy pro denní boty se
+vypnou), je potřeba: 1) rozhodnout/schválit s uživatelem přesný okamžik
+přepnutí, 2) zapojit watchdog kontrolu kontejneru do cronu, 3) zároveň
+odstranit/vypnout hostové `pgrep`/`nohup` bloky pro denní profily ve
+`watchdog.sh`, ať nehlídá oboje najednou. Samostatná budoucí iterace se
+svým specem, ne automatické zapnutí jako vedlejší efekt.
