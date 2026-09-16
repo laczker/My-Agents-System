@@ -186,6 +186,38 @@ neškodná (štítek + archiv), ne nevratná.
 Date:
 2026-09-15
 
+## Oprava: selhání kvůli nedostupným Gmail nástrojům se logovalo jako úspěch s nulami
+
+Co se stalo:
+Dávka #290 (16.9.) selhala, protože `mcp__claude_ai_Gmail__*` nástroje v
+tý session vůbec nebyly dostupné (OAuth výpadek, stejný typ jako v
+konverzaci 15.9. — "Failed to authenticate: OAuth session expired..."). Vnitřní
+`claude -p` běh na to ale zareagoval tak, že to nerozlišil od "0 nepřečtených
+vláken", a `nightly_cleanup.sh` bez BATCH_ERROR sentinelu zapsal do logu
+`OK deleted=0 accounts=0 toread=0 pending=0 unsubscribe=0` — tedy jako
+tichý úspěch s nulovou aktivitou, ne jako selhání. Skutečný stav (žádná
+kontrola neproběhla) byl vidět jen v `CLEANUP_PROGRESS.md`, ne přímo v
+logu. Nahlásil to `personal/assistant` (16.9., cross-session zpráva).
+
+Oprava:
+1. Prompt v `nightly_cleanup.sh` teď výslovně rozlišuje "nástroj selhal/není
+   dostupný" od "nástroj proběhl a nic nenašel" — při chybě nástrojů vypíše
+   `BATCH_ERROR: <důvod>` místo `BATCH_RESULT` s nulami.
+2. Wrapper skript `BATCH_ERROR` detekuje zvlášť a loguje/hlásí jako selhání
+   (`FAIL (batch-error) ...`), ne jako `OK`.
+3. Navíc ošetřen i obecnější případ: pokud výstup neobsahuje ani
+   `BATCH_RESULT`, ani `BATCH_ERROR` (neočekávaný tvar výstupu), wrapper to
+   teď taky loguje/hlásí jako selhání místo tichého defaultu na nuly.
+
+Why:
+Log měl dřív jen dvě úrovně (STATUS≠0/prázdný výstup ⇒ FAIL, cokoliv jiné ⇒
+OK), takže "proběhlo, ale nic nenašlo" a "vůbec se to nespustilo" vypadaly v
+logu identicky. To muselo vést k ručnímu čtení `CLEANUP_PROGRESS.md`, aby
+šlo poznat rozdíl.
+
+Date:
+2026-09-16
+
 ## Přechod z opakovaného nočního probouzení (co 20 min) na jeden běh denně
 
 Historický balast inboxu byl dávno vyčištěný (viz `CLEANUP_PROGRESS.md`,

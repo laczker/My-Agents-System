@@ -67,8 +67,20 @@ inboxu.
    ID pro tuhle dávku. Štítek "K-rozhodnutí" má ověřené ID Label_1 (nemusíš
    hledat znovu).
 
+   DŮLEŽITÉ — pokud jakékoliv volání `mcp__claude_ai_Gmail__*` v tomhle
+   kroku (nebo kdekoliv dál) selže, spadne na chybu autorizace, nebo ty
+   nástroje vůbec nejsou dostupné (nenajdeš je ani přes ToolSearch): tohle
+   NENÍ totéž jako "0 vláken k zpracování". Okamžitě přestaň a jako úplně
+   poslední řádek výstupu (nic za ním, ŽÁDNÝ BATCH_RESULT) vypiš přesně:
+   BATCH_ERROR: <krátký česky popis příčiny, např. "Gmail MCP nástroje
+   nedostupné" nebo "OAuth chyba při volání list_labels">
+   Nedokončuj zbytek kroků, nepiš BATCH_RESULT s nulami — nulový výsledek
+   smí znamenat jen "opravdu jsem se podíval a nic tam nebylo", ne "nemohl
+   jsem se podívat".
+
 1. Spusť mcp__claude_ai_Gmail__search_threads s dotazem `is:unread in:inbox`,
-   vezmi až 200 vláken z výsledku.
+   vezmi až 200 vláken z výsledku. (Selhání tohohle volání = stejné pravidlo
+   jako v kroku 0 výš — BATCH_ERROR, ne BATCH_RESULT s nulami.)
 
 2. Pokud je výsledek 0 vláken, nic dál nedělej a rovnou vypiš BATCH_RESULT
    (viz níž) s nulami — NEPIŠ žádný záznam do CLEANUP_PROGRESS.md (žádná
@@ -106,13 +118,16 @@ inboxu.
    posledním řádkem výstupu jeden nebo víc řádků přesně ve tvaru:
    ESCALATE: <krátký česky popis, jedna věta>
 
-Úplně poslední řádek výstupu (nic za ním) musí být přesně ve tvaru:
+Pokud jsi dávku dokončil bez chyby nástrojů, úplně poslední řádek výstupu
+(nic za ním) musí být přesně ve tvaru:
 BATCH_RESULT: deleted=<N> accounts=<M> toread=<R> pending=<P> unsubscribe=<U>
 
 kde deleted=Čistý spam, accounts=Účty a objednávky, toread=K přečtení,
 pending=K rozhodnutí, unsubscribe=kolik vláken navíc dostalo štítek
 "Kandidát na odhlášení" (podmnožina toread/accounts, ne samostatná kategorie).
-Nic jiného na závěr nepiš.
+Nic jiného na závěr nepiš. Pokud jsi místo toho narazil na chybu nástrojů
+podle pravidla v kroku 0/1 výš, vypiš místo něj BATCH_ERROR: <popis> a nic
+jiného.
 EOF
 )
 
@@ -131,7 +146,25 @@ if [ -n "$ESCALATE_LINES" ]; then
   send_telegram "⚠️ $(echo "$ESCALATE_LINES" | sed 's/^ESCALATE: //')"
 fi
 
+# BATCH_ERROR = dávka se sama vzdala kvůli chybě nástrojů (např. Gmail MCP
+# nedostupné/OAuth) — status skriptu claude -p je přitom 0, takže tohle
+# NENÍ pokryté kontrolou výše. Rozlišit od "opravdu 0 vláken", jinak se
+# tohle tiše zaloguje jako OK s nulami (viz #290, 16.9.).
+BATCH_ERROR_LINE=$(echo "$OUTPUT" | grep '^BATCH_ERROR:' | tail -1)
+if [ -n "$BATCH_ERROR_LINE" ]; then
+  REASON=$(echo "$BATCH_ERROR_LINE" | sed 's/^BATCH_ERROR: //')
+  log "FAIL (batch-error) $REASON"
+  send_telegram "⚠️ Denní třídění inboxu dnes neproběhlo: ${REASON} — další pokus až zítra, mrkni na nightly_cleanup_log.txt."
+  exit 1
+fi
+
 RESULT_LINE=$(echo "$OUTPUT" | grep '^BATCH_RESULT:' | tail -1)
+if [ -z "$RESULT_LINE" ]; then
+  log "FAIL (žádný BATCH_RESULT/BATCH_ERROR v výstupu — neočekávaný tvar)"
+  send_telegram "⚠️ Denní třídění inboxu: neočekávaný výstup dávky (chybí BATCH_RESULT) — mrkni na nightly_cleanup_log.txt."
+  exit 1
+fi
+
 DEL=$(echo "$RESULT_LINE" | sed -n 's/.*deleted=\([0-9]*\).*/\1/p')
 ACC=$(echo "$RESULT_LINE" | sed -n 's/.*accounts=\([0-9]*\).*/\1/p')
 TOREAD=$(echo "$RESULT_LINE" | sed -n 's/.*toread=\([0-9]*\).*/\1/p')
