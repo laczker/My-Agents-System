@@ -1,5 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { GrammyError } from "grammy";
 import { OUTBOX_FILE, OUTBOX_RETRY_INTERVAL_MS, TELEGRAM_CHAT_ID } from "./config.js";
+
+// 400 = chyba vázaná na tuhle konkrétní zprávu/chat (např. "chat not found", příliš
+// dlouhý text, špatný Markdown) — retry by dopadl stejně, takže zahodit.
+// 403 = bot je v chatu zablokovaný/vyhozený — trvalé pro celý chat, ne jen tuhle
+// zprávu, ale pořád nemá smysl frontu blokovat kvůli němu.
+const PERMANENT_ERROR_CODES = new Set([400, 403]);
 
 interface OutboxItem {
   id: string;
@@ -54,6 +61,12 @@ export class Outbox {
         try {
           await this.sendFn(item.text, item.chatId ?? TELEGRAM_CHAT_ID);
         } catch (e) {
+          if (e instanceof GrammyError && PERMANENT_ERROR_CODES.has(e.error_code)) {
+            console.error(`Odeslání trvale selhalo (${e.error_code}), zahazuji zprávu ${item.id}:`, e);
+            this.items.shift();
+            this.persist();
+            continue;
+          }
           console.error(`Odeslání selhalo, zůstává ve frontě (zkusím znovu za ${OUTBOX_RETRY_INTERVAL_MS}ms):`, e);
           return;
         }
