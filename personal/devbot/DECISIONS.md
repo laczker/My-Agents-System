@@ -1,5 +1,31 @@
 # DevBot — architektonická rozhodnutí
 
+## Fallback větev `runClaude` respektuje `isError`, aktivní upozornění při OAuth výpadku (iterace A)
+
+**Decision:** `RunClaudeOutcome` rozšířen o `"auth_error"` a `"error"` stav vedle
+`"ok"`/`"rate_limited"`. Fallback větev (po restart+retry) teď kontroluje `isError`
+stejně jako hlavní větev — dřív ho ignorovala a vracela chybový text jako `"ok"`
+výsledek. Rozpoznaný OAuth vzor (`/oauth/i` + `/expired|authenticat/i` v textu)
+jde jako `auth_error` broadcastem všem chatům (stejně jako rate limit — netýká se
+jen tazatele, dokud auth nefunguje, neodpoví na nic). Ostatní chyby po fallbacku
+jdou jako `error` jen tazateli s `⚠️` prefixem.
+
+**Why:** Incident 14.9. — `"OAuth session expired and could not be refreshed"` se
+poslalo uživateli jako běžný `✅ Výsledek`, protože fallback větev nekontrolovala
+`isError`. Detekce přes text, ne strukturovaný signál (na rozdíl od rate limitu,
+kde `claude` CLI posílá `rate_limit_event`) — auth chyba žádný takový event nemá.
+
+**Alternatives:**
+- Nechat obecné chyby (non-OAuth) dál jako `"ok"` s `⚠️` prefixem (původní vzor
+  z catch větve) — zamítnuto, matoucí kombinace `✅ Výsledek` + `⚠️` text; nový
+  `"error"` kind je jasnější, `index.ts` ho zobrazí bez `✅`.
+- Krátkodobě detekovat OAuth vzor už v hlavní (první) větvi a přeskočit
+  restart+retry úplně — zamítnuto, restart je levný a jindy skutečně pomůže
+  (např. dočasná chyba spojení), netřeba měnit dnešní strukturu tam, kde bug
+  není.
+
+**Date:** 2026-09-17
+
 ## Mount META_BOT.md/ARCHITEKTURA.md do denního kontejneru jen read-only (iterace 3)
 
 **Decision:** `docker-compose.daily.yml` mountuje `META_BOT.md` a `ARCHITEKTURA.md`

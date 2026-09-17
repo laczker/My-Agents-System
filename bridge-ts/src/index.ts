@@ -103,8 +103,16 @@ async function processQueue(): Promise<void> {
       }
       jobQueue.shift();
       persistQueue();
-      appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
-      sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
+      if (outcome.kind === "auth_error") {
+        // Netýká se jen tazatele — dokud auth nefunguje, neodpoví ani na další
+        // zprávy, proto broadcast všem povoleným chatům jako u rate limitu.
+        broadcastMsg(`🔐 Claude autentizace vypadla (OAuth session expired), úkol nedokončen: ${outcome.text}`);
+      } else if (outcome.kind === "error") {
+        sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId);
+      } else {
+        appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
+        sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
+      }
       touchHeartbeat();
     }
   } finally {

@@ -1,5 +1,15 @@
 # DevBot — otevřené úkoly
 
+## Rozpracováno
+
+### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)
+
+Iterace A (hotovo) opravila, že OAuth výpadek se aktivně nahlásí místo tichého
+doručení jako běžný výsledek — ale jen v rámci `bridge-ts` procesu samotného.
+Watchdog na hostu dnes umí zjistit jen "proces neběží" (`pgrep`), ne "proces
+běží, ale je v `auth_error` smyčce" — to bylo v původním zadání jako bod 3,
+zůstává samostatná iterace (jiný typ řešení, bash health-check místo TS kódu).
+
 ## Odloženo
 
 ### Adresářový mount pro META_BOT.md/ARCHITEKTURA.md (zjištěno 15.9., iterace 3)

@@ -18,7 +18,19 @@ interface ClaudeResult {
 
 export type RunClaudeOutcome =
   | { kind: "ok"; text: string }
-  | { kind: "rate_limited"; resetsAtMs: number | null };
+  | { kind: "rate_limited"; resetsAtMs: number | null }
+  | { kind: "auth_error"; text: string }
+  | { kind: "error"; text: string };
+
+// "OAuth session expired and could not be refreshed" / "Failed to authenticate" —
+// ověřeno na incidentu 14.9. Širší konzervativní match, ať přežije mírně jinou
+// budoucí formulaci téhož selhání.
+const OAUTH_ERROR_PATTERN = /oauth/i;
+const AUTH_FAILURE_PATTERN = /expired|authenticat/i;
+
+function looksLikeAuthError(text: string): boolean {
+  return OAUTH_ERROR_PATTERN.test(text) && AUTH_FAILURE_PATTERN.test(text);
+}
 
 /** Prefix, kterým bot může začít text unsolicited tahu, aby se NEODESLAL do
  * Telegramu (viz `handleUnsolicitedLine`). Sdílené napříč všemi profily bota. */
@@ -346,11 +358,12 @@ export async function runClaude(cp: ClaudeProcess, userText: string, downloadedF
   cp.kill();
   cp.start(null);
   try {
-    const { result, rateLimitedAt } = await cp.send(buildSeedPrompt(userText, downloadedFileInfo));
+    const { result, isError, rateLimitedAt } = await cp.send(buildSeedPrompt(userText, downloadedFileInfo));
     if (rateLimitedAt) return { kind: "rate_limited", resetsAtMs: rateLimitedAt.resetsAtMs };
+    if (isError) return looksLikeAuthError(result) ? { kind: "auth_error", text: result } : { kind: "error", text: result };
     return { kind: "ok", text: result };
   } catch (e) {
     console.error("Chyba i po restartu claude procesu:", e);
-    return { kind: "ok", text: `⚠️ Nepodařilo se spojit s Claude procesem: ${e}` };
+    return { kind: "error", text: `Nepodařilo se spojit s Claude procesem: ${e}` };
   }
 }
