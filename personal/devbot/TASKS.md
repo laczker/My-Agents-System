@@ -23,6 +23,33 @@ Dokud nevyřešeno: assistant (a kdokoliv jiný) uvnitř kontejneru nemůže
 `META_BOT.md`/`ARCHITEKTURA.md` upravovat — architektonické změny, co CLAUDE.md
 ukládá zapisovat do těchto souborů, musí probíhat na hostu, ne v kontejneru.
 
+### Telegram UX vylepšení v bridge-ts — zadáno 15.9., nikdy nezačato (zjištěno 16.9.)
+
+Uživatel 15.9. přes asistenta požádal o research, proč Telegram u kolegy (řešení
+od Ludwiga, `petrludwig-collab/Agent2Telegram`, inspirace pro celý systém)
+působí víc jako živý chat — typing animace, reakce na zprávu, lepší formátování.
+Asistent research udělal a zjištění poslal mně (`devbot`) přes `SendMessage`
+týž den: **první vlna** — typing indikátor (`sendChatAction`) + Markdown
+formátování (`parse_mode` v `bot.api.sendMessage`, `bridge-ts`), s poznámkou
+otestovat, než se to dotkne doručování zpráv ostatním 6 botům. **Druhá vlna**
+(zadaná jako budoucí, ne součást prvního zadání): reply na konkrétní zprávu
+(`reply_parameters`), emoji reakce (`setMessageReaction`), živá editace zprávy
+(`editMessageText` místo "⏳ Zpracovávám...").
+
+Realita: nikdy jsem se do toho nepustil. V `chat_history.txt` tady u mě po
+zadání není jediná zmínka typing/markdown/parse_mode/sendChatAction — místo
+toho jsem rovnou pokračoval Docker pilotem. Na rozdíl od OAuth bugu a
+`outbox.ts` fronty (obě aspoň zapsané v `personal/assistant/TASKS.md` sekci
+"Rozpracováno") tenhle úkol nebyl zapsaný nikde kromě samotné konverzace —
+hůř dohledatelné, stejná chyba (nepřevzal jsem SendMessage úkol do vlastního
+TASKS.md a nechal ho převálcovat dalším "pokračuj").
+
+Rozsah první vlny: `bridge-ts/src/index.ts:14-19` (dnes čistý
+`bot.api.sendMessage(chatId, chunk)` bez options) — přidat `sendChatAction`
+na začátku zpracování (opakovat ~každé 4s dokud trvá) a `parse_mode:
+"MarkdownV2"` nebo `"HTML"` s escapováním. Sdílený kód pro všech 7 běžících
+botů → nutné důkladně otestovat před nasazením, ne jen v devbot chatu.
+
 ### Aktivace watchdog restartu kontejneru v cronu (zjištěno 16.9., iterace 4)
 
 Iterace 4 přidává do `watchdog.sh` schopnost hlídat/restartovat denní Docker
