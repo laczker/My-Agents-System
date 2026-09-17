@@ -188,10 +188,12 @@ bot.on("message", async (ctx) => {
   const wasIdle = jobQueue.length === 0 && !processing;
   jobQueue.push({ userText, downloadedFileInfo, chatId });
   persistQueue();
-  // Při wasIdle se záměrně neposílá žádná textová hláška — typing indikátor
-  // (startTypingIndicator, spuštěný hned na začátku processQueue) tohle pokrývá
-  // animací, textová "⏳ Zpracovávám..." ji dřív zbytečně zastiňovala.
-  if (!wasIdle) {
+  // Typing indikátor (startTypingIndicator, spuštěný hned na začátku processQueue)
+  // se u některých klientů nezobrazuje v otevřené konverzaci (jen v seznamu chatů),
+  // proto vedle něj jede i textová hláška jako spolehlivá zpětná vazba.
+  if (wasIdle) {
+    sendMsg(`⏳ Zpracovávám...`, chatId);
+  } else {
     sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
   }
 
