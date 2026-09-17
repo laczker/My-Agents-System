@@ -14,7 +14,18 @@ const bot = new Bot(TELEGRAM_BOT_TOKEN);
 async function sendRaw(text: string, chatId: string): Promise<void> {
   const chunks = text.match(/[\s\S]{1,4000}/g) ?? [text];
   for (const chunk of chunks) {
-    await bot.api.sendMessage(chatId, chunk);
+    try {
+      await bot.api.sendMessage(chatId, chunk, { parse_mode: "Markdown" });
+    } catch (e) {
+      // Claude negeneruje text čistě pro legacy Telegram Markdown (rozjeté/nepárové
+      // entity) — radši doručit syrový text než ho nechat spadnout do outboxu, kde
+      // by ho nová 400-permanent-error logika tiše zahodila (viz DECISIONS.md).
+      if (e instanceof GrammyError && e.error_code === 400 && e.description.includes("can't parse entities")) {
+        await bot.api.sendMessage(chatId, chunk);
+      } else {
+        throw e;
+      }
+    }
   }
 }
 
@@ -75,6 +86,15 @@ function enterRateLimitWait(resetsAtMs: number | null, isRestore = false): void 
   }, delay);
 }
 
+// Telegram "typing..." animace zmizí uživateli po ~5s, proto se musí opakovat po
+// dobu, co `runClaude` běží (klidně desítky minut). Chyba (výpadek sítě apod.) se
+// tiše ignoruje — jde o kosmetiku, nesmí shodit/zpozdit zpracování úkolu.
+function startTypingIndicator(chatId: string): NodeJS.Timeout {
+  const tick = () => void bot.api.sendChatAction(chatId, "typing").catch(() => {});
+  tick();
+  return setInterval(tick, 4_000);
+}
+
 async function processQueue(): Promise<void> {
   if (processing) return;
   // Ještě se čeká na reset kvóty — timer výš to sám odblokuje, tenhle časný
@@ -86,6 +106,7 @@ async function processQueue(): Promise<void> {
       const job = jobQueue[0];
       const jobChatId = job.chatId ?? TELEGRAM_CHAT_ID;
       let outcome: Awaited<ReturnType<typeof runClaude>>;
+      const typingTimer = startTypingIndicator(jobChatId);
       try {
         outcome = await runClaude(claudeProcess, job.userText, job.downloadedFileInfo);
       } catch (e) {
@@ -96,6 +117,8 @@ async function processQueue(): Promise<void> {
         const msg = e instanceof Error ? e.message : String(e);
         sendMsg(`⚠️ Tah selhal (${msg}). Úkol zůstává ve frontě, zkusím to znovu při další zprávě.`, jobChatId);
         return;
+      } finally {
+        clearInterval(typingTimer);
       }
       if (outcome.kind === "rate_limited") {
         enterRateLimitWait(outcome.resetsAtMs);
