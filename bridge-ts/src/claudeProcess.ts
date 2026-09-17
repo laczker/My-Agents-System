@@ -22,9 +22,9 @@ export type RunClaudeOutcome =
   | { kind: "auth_error"; text: string }
   | { kind: "error"; text: string };
 
-// "OAuth session expired and could not be refreshed" / "Failed to authenticate" —
-// ověřeno na incidentu 14.9. Širší konzervativní match, ať přežije mírně jinou
-// budoucí formulaci téhož selhání.
+// Jediný známý vzor (incident 14.9.): "Failed to authenticate: OAuth session
+// expired and could not be refreshed" — oba regexy musí sednout zároveň, ať
+// nechytáme jiné auth chyby (např. špatný API klíč), co OAuth nezmiňují.
 const OAUTH_ERROR_PATTERN = /oauth/i;
 const AUTH_FAILURE_PATTERN = /expired|authenticat/i;
 
