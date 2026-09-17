@@ -87,6 +87,14 @@ znovu bez `parse_mode`. Otestováno jen typecheckem + `/code-review`, ne
 živě na produkčním provozu jiných botů — sdílený kód pro všech 7, sledovat
 logy po nasazení, jestli fallback cesta funguje i v praxi.
 
+**Doladění 17.9.** (branch `worktree-devbot-typing-instead-of-text`): uživatel
+po nasazení první vlny nahlásil, že animaci s tečkama nevidí — ukázalo se, že
+`index.ts` u prázdné fronty posílal ještě textovou "⏳ Zpracovávám..." hlášku
+(`bot.on("message")`), která typing indikátor časově zastiňovala. Hláška se u
+tohohle případu teď neposílá vůbec, jen typing animace (spouští se prakticky
+souběžně, uvnitř `processQueue` před `runClaude`). "📥 Přijato, ve frontě..."
+hláška pro neprázdnou frontu zůstává beze změny.
+
 **Druhá vlna (zůstává, mimo scope týhle iterace):** reply na konkrétní
 zprávu (`reply_parameters`), emoji reakce (`setMessageReaction`), živá
 editace zprávy (`editMessageText` místo "⏳ Zpracovávám...").
