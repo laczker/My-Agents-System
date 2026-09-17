@@ -188,7 +188,12 @@ bot.on("message", async (ctx) => {
   const wasIdle = jobQueue.length === 0 && !processing;
   jobQueue.push({ userText, downloadedFileInfo, chatId });
   persistQueue();
-  sendMsg(wasIdle ? "⏳ Zpracovávám..." : `📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
+  // Při wasIdle se záměrně neposílá žádná textová hláška — typing indikátor
+  // (startTypingIndicator, spuštěný hned na začátku processQueue) tohle pokrývá
+  // animací, textová "⏳ Zpracovávám..." ji dřív zbytečně zastiňovala.
+  if (!wasIdle) {
+    sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
+  }
 
   // Nečeká se na dokončení — handler se vrátí hned, aby grammY mohl přijmout další
   // zprávu okamžitě, i když tahle ještě běží (řeší "neodpovídáš, když pošlu víc zpráv").
