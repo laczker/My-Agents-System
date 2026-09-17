@@ -103,8 +103,23 @@ async function processQueue(): Promise<void> {
       }
       jobQueue.shift();
       persistQueue();
-      appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
-      sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
+      if (outcome.kind === "auth_error") {
+        // Netýká se jen tazatele — dokud auth nefunguje, neodpoví ani na další
+        // zprávy, proto broadcast všem povoleným chatům jako u rate limitu.
+        broadcastMsg(`🔐 Claude autentizace vypadla (OAuth session expired), úkol nedokončen: ${outcome.text}`);
+        touchHeartbeat();
+        // Na rozdíl od rate_limited tu není časovač na obnovení — bez tohohle
+        // returnu by fronta hned zkusila i zbylé úkoly, každý s vlastním
+        // restart+retry (~30 min) a duplicitním broadcastem, i když auth
+        // nefunguje pro žádný z nich.
+        return;
+      }
+      if (outcome.kind === "error") {
+        sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId);
+      } else {
+        appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
+        sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
+      }
       touchHeartbeat();
     }
   } finally {
