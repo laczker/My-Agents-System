@@ -56,7 +56,7 @@ Dokud nevyřešeno: assistant (a kdokoliv jiný) uvnitř kontejneru nemůže
 `META_BOT.md`/`ARCHITEKTURA.md` upravovat — architektonické změny, co CLAUDE.md
 ukládá zapisovat do těchto souborů, musí probíhat na hostu, ne v kontejneru.
 
-### Telegram UX vylepšení v bridge-ts — zadáno 15.9., nikdy nezačato (zjištěno 16.9.)
+### Telegram UX vylepšení v bridge-ts — první vlna hotová (17.9.), druhá čeká
 
 Uživatel 15.9. přes asistenta požádal o research, proč Telegram u kolegy (řešení
 od Ludwiga, `petrludwig-collab/Agent2Telegram`, inspirace pro celý systém)
@@ -77,11 +77,19 @@ toho jsem rovnou pokračoval Docker pilotem. Na rozdíl od OAuth bugu a
 hůř dohledatelné, stejná chyba (nepřevzal jsem SendMessage úkol do vlastního
 TASKS.md a nechal ho převálcovat dalším "pokračuj").
 
-Rozsah první vlny: `bridge-ts/src/index.ts:14-19` (dnes čistý
-`bot.api.sendMessage(chatId, chunk)` bez options) — přidat `sendChatAction`
-na začátku zpracování (opakovat ~každé 4s dokud trvá) a `parse_mode:
-"MarkdownV2"` nebo `"HTML"` s escapováním. Sdílený kód pro všech 7 běžících
-botů → nutné důkladně otestovat před nasazením, ne jen v devbot chatu.
+**První vlna hotová 17.9.** (branch `worktree-telegram-ux-typing-markdown`):
+`startTypingIndicator()` v `index.ts` posílá `sendChatAction("typing")` na
+začátku zpracování úkolu, opakuje po 4s, `clearInterval` ve `finally` kolem
+`runClaude`. `sendRaw` zkouší `parse_mode: "Markdown"` (legacy V1, ne
+MarkdownV2 — zdůvodnění v `DECISIONS.md`), při chybě parsování entit
+(`error_code` 400, "can't parse entities") fallback pošle stejný chunk
+znovu bez `parse_mode`. Otestováno jen typecheckem + `/code-review`, ne
+živě na produkčním provozu jiných botů — sdílený kód pro všech 7, sledovat
+logy po nasazení, jestli fallback cesta funguje i v praxi.
+
+**Druhá vlna (zůstává, mimo scope týhle iterace):** reply na konkrétní
+zprávu (`reply_parameters`), emoji reakce (`setMessageReaction`), živá
+editace zprávy (`editMessageText` místo "⏳ Zpracovávám...").
 
 ### Aktivace watchdog restartu kontejneru v cronu (zjištěno 16.9., iterace 4)
 

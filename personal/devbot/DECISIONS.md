@@ -1,5 +1,34 @@
 # DevBot — architektonická rozhodnutí
 
+## Telegram UX: `parse_mode: "Markdown"` (legacy V1), ne `MarkdownV2`
+
+**Decision:** `sendRaw` posílá chunky s `parse_mode: "Markdown"` (legacy
+styl: `*bold*`, `_italic_`, `` `code` ``). Při chybě parsování entit
+(`GrammyError`, `error_code` 400, popis obsahuje "can't parse entities") se
+stejný chunk pošle znovu bez `parse_mode` (syrový text, dnešní chování) —
+teprve jiná chyba probublá dál k `outbox`.
+
+**Why:** `MarkdownV2` vyžaduje escapovat širokou sadu běžných interpunkčních
+znaků (`_*[]()~\`>#+-=|{}.!`) v celém textu mimo entity — Claude generuje
+běžnou prózu/markdown, ne MarkdownV2-safe text, takže by prakticky každá
+zpráva s tečkou, závorkou nebo pomlčkou skončila na 400 a spadla do
+fallbacku (formátování by se ztrácelo skoro pořád, funkce by byla
+bezúčelná). Legacy `Markdown` netoleruje jen nepárové/rozjeté entity
+(`*`, `_`, `` ` ``, `[`), což je řádově vzácnější. Vedlejší efekt: Claude
+běžně píše `**tučně**` (dvojhvězdička, standardní markdown), legacy mód
+bere jen jednu hvězdičku jako přepínač — dvojice hvězdiček se spáruje do
+dvou prázdných tučných úseků bez viditelného formátování, ale bez chyby
+parsování (sudý počet, korektně uzavřené). Ztráta tučného řezu je přijatelná
+kosmetická vada teď; převod `**` → `*` je out of scope (druhá vlna).
+
+**Alternatives:**
+- `MarkdownV2` — zamítnuto, viz výš (masivní fallback rate).
+- Žádný `parse_mode`, jen HTML sanitizace `<b>`/`<i>` generovaná z markdownu —
+  zvažováno, ale znamená psát vlastní markdown→HTML převodník; mimo rozsah
+  týhle iterace (jen `parse_mode` + fallback).
+
+**Date:** 2026-09-17
+
 ## `outbox.ts` zahazuje trvale nedoručitelné zprávy (400/403) místo blokace celé fronty
 
 **Decision:** `flush()` v catch bloku rozlišuje `GrammyError` s `error_code` 400
