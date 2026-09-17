@@ -1,5 +1,34 @@
 # DevBot — architektonická rozhodnutí
 
+## `outbox.ts` zahazuje trvale nedoručitelné zprávy (400/403) místo blokace celé fronty
+
+**Decision:** `flush()` v catch bloku rozlišuje `GrammyError` s `error_code` 400
+nebo 403 (trvalá chyba) od všeho ostatního (dočasná chyba — síť, 5xx, 429).
+Trvalá chyba: zaloguje se, položka se zahodí (`shift`+`persist`), smyčka
+pokračuje na další položku ve frontě. Dočasná chyba: beze změny — `return`,
+další pokus až za `OUTBOX_RETRY_INTERVAL_MS`.
+
+**Why:** Incident nahlášený `nakup` — jedna trvale nedoručitelná zpráva (400
+"chat not found") zastavila `flush()` `return`em bez ohledu na typ chyby,
+takže se zablokovalo doručování VŠEM chatům/zprávám za ní ve frontě na 3
+týdny (log narostl na 145 MB). 400 typicky značí chybu vázanou na
+konkrétní zprávu/chat (i "message too long", špatný Markdown) — retry by
+dopadl stejně, zahození dává smysl obecně, ne jen pro tenhle incident. 403
+(bot zablokovaný v chatu) je trvalé pro celý chat, ne jen zprávu — bude
+zahazovat i každou další zprávu do stejného chatu potichu, ne blokovat
+frontu; přijatelné (fronta funguje pro ostatní chaty), ale znamená tiché
+mizení zpráv do zablokovaného chatu bez alertu.
+
+**Alternatives:**
+- Zahazovat po N opakovaných neúspěších bez ohledu na kód chyby — zamítnuto,
+  nerozlišuje trvalé od dočasných, u dočasné chyby (výpadek sítě) by mohlo
+  zahodit zprávu, co by při dalším pokusu prošla.
+- Alertovat uživatele při 403 (zablokovaný chat) místo tichého zahození —
+  zvažováno, ale mimo schválený rozsah týhle iterace; případná budoucí
+  iterace.
+
+**Date:** 2026-09-17
+
 ## Fallback větev `runClaude` respektuje `isError`, aktivní upozornění při OAuth výpadku (iterace A)
 
 **Decision:** `RunClaudeOutcome` rozšířen o `"auth_error"` a `"error"` stav vedle

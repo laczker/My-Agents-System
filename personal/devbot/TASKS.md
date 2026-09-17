@@ -1,5 +1,21 @@
 # DevBot — otevřené úkoly
 
+## Poznámka k procesu
+
+### `EnterWorktree` větví z `origin/main`, ne z lokálního `main` (zjištěno 17.9., iterace outbox)
+
+`origin/main` na GitHubu je pozadu za lokálním `main` (naposledy pushnuto 9.9.,
+lokální `main` má od té doby o 8 commitů víc, včetně celé iterace A OAuth
+fixu) — není to rozdílná historie, jen zastaralý `origin`. Nový worktree přes
+`EnterWorktree` (výchozí `baseRef: fresh`) se ale větví z `origin/main`, takže
+by tiše chyběl obsah nedávno zamergovaných iterací, dokud by se nerebasoval na
+lokální `main` ručně (jak se stalo tady — objeveno až při kontrole `git log`,
+opraveno `git rebase main` bez konfliktů).
+
+Do budoucna: po každém `EnterWorktree` ověřit `git merge-base HEAD main`, a
+pokud se liší od `main`, rebasovat na lokální `main` dřív, než se začne
+implementovat — ne až u kontroly před checkpointem.
+
 ## Rozpracováno
 
 ### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)
