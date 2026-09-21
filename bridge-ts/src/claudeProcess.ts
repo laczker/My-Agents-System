@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { openSync } from "node:fs";
 import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS, CLAUDE_MODEL } from "./config.js";
 import { getSessionId, saveSessionId } from "./session.js";
-import { getHistory } from "./history.js";
+import { getHistory, appendHistory } from "./history.js";
 import { looksLikeRateLimitText, parseResetsAtFromText, normalizeResetsAt } from "./rateLimit.js";
 import { logTurn } from "./turnLog.js";
 
@@ -174,8 +174,21 @@ export class ClaudeProcess {
     }
     if (obj.type === "result") {
       const text = obj.result;
-      if (text && text !== this.unsolicitedText) {
-        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
+      const isSilent = typeof text === "string" && text.trimStart().startsWith(SILENT_MARKER);
+      if (text && !isSilent) {
+        // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce níž (ta řeší
+        // jen to, aby se do Telegramu neposlal stejný text dvakrát, když
+        // `result.result` zopakuje poslední `assistant` blok) — do historie musí
+        // jít finální text KAŽDÉHO nemlčeného unsolicited tahu vždycky, jinak o
+        // něm agent po pozdějším cyklení kontextu (seed jen z `chat_history.txt`)
+        // neví nic (incident: takhle se ztratil celý schválený spec). Zapisuje se
+        // jen tahle finální zpráva, ne streamované mezikroky výš, ať se historie
+        // nenafoukne duplicitně. `logTurn`/statistika tahů se sem záměrně
+        // nezahrnuje — tenhle tah nemá `usage` data z `runClaude`.
+        appendHistory("[cross-session/background událost]", text);
+      }
+      if (text && text !== this.unsolicitedText && !isSilent) {
+        this.onUnsolicitedText?.(text);
       }
       this.unsolicitedText = "";
     }
