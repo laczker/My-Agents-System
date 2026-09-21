@@ -5,7 +5,7 @@ export function getHistory(): string {
   if (!existsSync(HISTORY_FILE)) return "";
   const content = readFileSync(HISTORY_FILE, "utf-8");
   const exchanges = content.split("---\n").filter((e) => e.trim());
-  return exchanges.slice(-HISTORY_EXCHANGES).join("---\n");
+  return unescapeDelimiter(exchanges.slice(-HISTORY_EXCHANGES).join("---\n"));
 }
 
 // Zápis exchange bloku nesmí obsahovat přesnou sekvenci delimiteru (`"---\n"`),
@@ -16,9 +16,16 @@ export function getHistory(): string {
 // odpovídat delimiteru. Escapuje se až CELÉ sestavené tělo (`Uživatel: ...
 // \nClaude: ...\n`), ne `userMsg`/`botMsg` zvlášť před sestavením — jinak by
 // unikla kolize vzniklá až spojením, např. `userMsg` končící na `---` těsně
-// před šablonou vloženým `\nClaude: `.
+// před šablonou vloženým `\nClaude: `. `getHistory()` musí escapování zase
+// odstranit (`unescapeDelimiter`) — jinak by se zero-width space natrvalo
+// propsala do seedovaného kontextu při každém dalším čtení, i pro text, co
+// žádnou skutečnou kolizi nikdy neměl.
 function escapeDelimiter(text: string): string {
   return text.replace(/---\n/g, "---​\n");
+}
+
+function unescapeDelimiter(text: string): string {
+  return text.replace(/---​\n/g, "---\n");
 }
 
 export function appendHistory(userMsg: string, botMsg: string): void {

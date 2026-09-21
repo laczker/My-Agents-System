@@ -122,6 +122,15 @@ neshodí Telegram broadcast ani reset dedup stavu. `logTurn`/`turn_log_ts.jsonl`
 změny (tenhle tah nemá `usage` data z `runClaude`). Platí pro všech 7 profilů stejně,
 protože jde o sdílený kód `bridge-ts`.
 
+`history.ts` odděluje výměny v `chat_history.txt` doslovným řetězcem `"---\n"` —
+kolizí s markdownovou horizontální linkou (běžnou v Markdown-formátovaném textu,
+který teď zapisuje i výše popsaný unsolicited zápis) by se jedna výměna rozsekla
+na víc nelabelovaných fragmentů. `appendHistory()` proto před zápisem takovou
+kolizi escapuje (neviditelný zero-width space hned za `---`), `getHistory()` ho
+při čtení zase odstraňuje — pokud budeš `chat_history.txt` někdy prohlížet/grepovat
+přímo (ne přes `getHistory()`), počítej s tím, že soubor na disku obsahuje
+neviditelné znaky navíc kolem `---` uvnitř textu výměn.
+
 ## 2. Struktura jednoho bota (šablona pro založení dalšího)
 
 Každý bot = vlastní adresář `personal/<jméno>/`:

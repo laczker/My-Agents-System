@@ -179,8 +179,8 @@ export class ClaudeProcess {
       }
     }
     if (obj.type === "result") {
-      const text = obj.result;
-      const isSilent = typeof text === "string" && text.trimStart().startsWith(SILENT_MARKER);
+      const text = typeof obj.result === "string" ? obj.result : "";
+      const isSilent = text.trimStart().startsWith(SILENT_MARKER);
       const shouldNotify = Boolean(text) && text !== this.unsolicitedText && !isSilent;
       // Reset jde první a je čistě v paměti (nemůže selhat) — Telegram broadcast
       // a zápis do historie níž oba dělají I/O a oba mají svůj vlastní try/catch,
