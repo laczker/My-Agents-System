@@ -8,6 +8,19 @@ export function getHistory(): string {
   return exchanges.slice(-HISTORY_EXCHANGES).join("---\n");
 }
 
+// Zápis dovnitř exchange bloku nesmí obsahovat přesnou sekvenci delimiteru
+// (`"---\n"`), kterým `getHistory()` bloky rozděluje — jinak markdownové
+// horizontální linky v textu (běžné v checkpointech/specech) rozseknou jeden
+// exchange na víc nelabelovaných fragmentů. Vloží se neviditelný zero-width
+// space hned za trojici pomlček, ať se řádek vizuálně nezmění, ale přestane
+// bajtově odpovídat delimiteru.
+function escapeDelimiter(text: string): string {
+  return text.replace(/---\n/g, "---​\n");
+}
+
 export function appendHistory(userMsg: string, botMsg: string): void {
-  appendFileSync(HISTORY_FILE, `Uživatel: ${userMsg}\nClaude: ${botMsg}\n---\n`);
+  appendFileSync(
+    HISTORY_FILE,
+    `Uživatel: ${escapeDelimiter(userMsg)}\nClaude: ${escapeDelimiter(botMsg)}\n---\n`,
+  );
 }

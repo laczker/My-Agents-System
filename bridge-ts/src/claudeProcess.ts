@@ -169,7 +169,13 @@ export class ClaudeProcess {
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
         this.unsolicitedText = text;
-        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
+        if (!text.trimStart().startsWith(SILENT_MARKER)) {
+          try {
+            this.onUnsolicitedText?.(text);
+          } catch (err) {
+            console.error("Telegram broadcast unsolicited textu selhal:", err);
+          }
+        }
       }
     }
     if (obj.type === "result") {
