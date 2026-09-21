@@ -175,15 +175,19 @@ export class ClaudeProcess {
     if (obj.type === "result") {
       const text = obj.result;
       const isSilent = typeof text === "string" && text.trimStart().startsWith(SILENT_MARKER);
-      // Telegram broadcast a reset `unsolicitedText` musí proběhnout, i kdyby
-      // zápis do historie níž selhal (ENOSPC/EACCES na appendFileSync by jinak
-      // jako synchronní výjimka shodil zbytek téhle větve — uživatel by o
-      // unsolicited tahu nedostal vůbec žádnou zprávu a dedup stav by zůstal
-      // zaseklý na starém textu).
-      if (text && text !== this.unsolicitedText && !isSilent) {
-        this.onUnsolicitedText?.(text);
-      }
+      const shouldNotify = Boolean(text) && text !== this.unsolicitedText && !isSilent;
+      // Reset jde první a je čistě v paměti (nemůže selhat) — Telegram broadcast
+      // a zápis do historie níž oba dělají I/O a oba mají svůj vlastní try/catch,
+      // aby selhání jednoho (ENOSPC/EACCES, výpadek Telegram API) neshodilo ten
+      // druhý ani nezanechalo dedup stav zaseklý na starém textu.
       this.unsolicitedText = "";
+      if (shouldNotify) {
+        try {
+          this.onUnsolicitedText?.(text);
+        } catch (err) {
+          console.error("Telegram broadcast unsolicited textu selhal:", err);
+        }
+      }
       if (text && !isSilent) {
         // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce výš (ta řeší
         // jen to, aby se do Telegramu neposlal stejný text dvakrát, když

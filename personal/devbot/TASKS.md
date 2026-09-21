@@ -18,6 +18,26 @@ implementovat — ne až u kontroly před checkpointem.
 
 ## Odloženo
 
+### `chat_history.txt` parsing se láme na doslovném `"---\n"` v textu tahu (zjištěno 21.9., 2. kolo review iterace "zápis unsolicited textu do historie") — vyšší priorita
+
+`history.ts` (`getHistory`) parsuje výměny přes `content.split("---\n")` a
+`appendHistory` odděluje výměny stejným řetězcem — pokud text uloženého tahu
+sám obsahuje řádek `---` (běžný Markdown divider, přesně styl, jakým tenhle
+bot i uživatel v Telegramu formátují specy/checkpointy sekcemi), `getHistory`
+tu jednu výměnu roztrhá na víc falešných fragmentů bez `Uživatel:`/`Claude:`
+návěští a `buildSeedPrompt` pak nový proces naseeduje polámaným/oříznutým
+kontextem — stejná třída incidentu, co tahle iterace měla opravit, jen jinou
+cestou. Preexistuje to i v původní (`appendHistory` z běžného Telegram tahu,
+`index.ts:143`) cestě, není to nové týhle iterací — nová `appendHistory`
+cesta z `handleUnsolicitedLine` ale zapisuje typicky Markdown-formátovaný text
+(specy, checkpointy), takže riziko výskytu `---` je prakticky vyšší než u
+běžných odpovědí. Oprava (jiný, kolizi-odolný delimiter nebo escaping při
+zápisu) je změna formátu `chat_history.txt` sdílená napříč `history.ts` a
+všemi 7 profily, včetně zpětné kompatibility se stávajícím obsahem souboru —
+samostatná budoucí iterace se svým specem, ne součást týhle. Vzhledem k
+závažnosti (tichá ztráta/zkomolení kontextu, ne jen chybějící zápis) řešit
+dřív než odloženou položku o růstu souboru níž.
+
 ### `chat_history.txt` roste bez rotace, teď i rychleji (zjištěno 21.9., review iterace "zápis unsolicited textu do historie")
 
 Iterace přidala do `handleUnsolicitedLine` druhý, častější zdroj zápisu do
