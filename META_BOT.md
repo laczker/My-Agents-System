@@ -108,6 +108,20 @@ nahlas psané pracovní myšlenky. Konvence proto teď je (viz `personal/zpravod
 nemarkovaná úvodní zpráva, pak `[TICHO]` na všechno mezi tím, a nemarkovaný finální
 výsledek (případně eskalace kdykoliv uprostřed).
 
+**Zápis unsolicited tahu do `chat_history.txt`** (incident 21.9., devbot): do 21.9.
+`handleUnsolicitedLine` posílal finální text (`obj.type === "result"`, ne mlčený
+`SILENT_MARKER`em) jen živě do Telegramu (`broadcastMsg`/`onUnsolicitedText`), nikdy ho
+nezapsal přes `appendHistory()` — po pozdějším proaktivním cyklení kontextu
+(`CONTEXT_CYCLE_THRESHOLD_TOKENS`, nový proces se seeduje jen z `chat_history.txt`) o
+takovém tahu agent nevěděl vůbec nic, i když ho uživatel viděl v Telegramu. U devbota se
+takhle ztratil celý schválený spec. Od 21.9. `handleUnsolicitedLine` zapisuje finální
+(ne streamované mezikroky) text KAŽDÉHO nemlčeného unsolicited tahu do
+`chat_history.txt` s neutrálním popiskem `[cross-session/background událost]`, nezávisle
+na Telegram broadcastu — zápis běží v `try/catch`, ať jeho případné selhání (ENOSPC apod.)
+neshodí Telegram broadcast ani reset dedup stavu. `logTurn`/`turn_log_ts.jsonl` beze
+změny (tenhle tah nemá `usage` data z `runClaude`). Platí pro všech 7 profilů stejně,
+protože jde o sdílený kód `bridge-ts`.
+
 ## 2. Struktura jednoho bota (šablona pro založení dalšího)
 
 Každý bot = vlastní adresář `personal/<jméno>/`:

@@ -16,6 +16,23 @@ Do budoucna: po každém `EnterWorktree` ověřit `git merge-base HEAD main`, a
 pokud se liší od `main`, rebasovat na lokální `main` dřív, než se začne
 implementovat — ne až u kontroly před checkpointem.
 
+## Odloženo
+
+### `chat_history.txt` roste bez rotace, teď i rychleji (zjištěno 21.9., review iterace "zápis unsolicited textu do historie")
+
+Iterace přidala do `handleUnsolicitedLine` druhý, častější zdroj zápisu do
+`chat_history.txt` (každý nemlčený unsolicited tah — cross-session zadání od
+jiného bota, dokončení async subagenta), vedle původního zápisu z běžných
+Telegram tahů. `history.ts` (`getHistory`) ale při čtení dělá `readFileSync`
+na celý soubor a teprve v paměti ho ořízne na posledních `HISTORY_EXCHANGES`
+(10) výměn — soubor na disku se nikdy netrimuje. Předchozí návrh (existující
+už před touhle iterací, ne nový) na velikosti nezáleželo, protože zápisy byly
+řídké; teď rostou rychleji. Zatím nejde o naléhavé riziko (růst v řádu KB/den),
+ale patří to sledovat u hostu s historií OOM (~3,7 GB RAM, viz `META_BOT.md`
+§4). Oprava (rotace/trim `chat_history.txt` na disku, ne jen v paměti) je
+sdílená změna `bridge-ts/src/history.ts` napříč všemi 7 profily — samostatná
+budoucí iterace se svým specem, ne součást týhle.
+
 ## Rozpracováno
 
 ### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)

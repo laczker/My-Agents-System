@@ -175,8 +175,17 @@ export class ClaudeProcess {
     if (obj.type === "result") {
       const text = obj.result;
       const isSilent = typeof text === "string" && text.trimStart().startsWith(SILENT_MARKER);
+      // Telegram broadcast a reset `unsolicitedText` musí proběhnout, i kdyby
+      // zápis do historie níž selhal (ENOSPC/EACCES na appendFileSync by jinak
+      // jako synchronní výjimka shodil zbytek téhle větve — uživatel by o
+      // unsolicited tahu nedostal vůbec žádnou zprávu a dedup stav by zůstal
+      // zaseklý na starém textu).
+      if (text && text !== this.unsolicitedText && !isSilent) {
+        this.onUnsolicitedText?.(text);
+      }
+      this.unsolicitedText = "";
       if (text && !isSilent) {
-        // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce níž (ta řeší
+        // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce výš (ta řeší
         // jen to, aby se do Telegramu neposlal stejný text dvakrát, když
         // `result.result` zopakuje poslední `assistant` blok) — do historie musí
         // jít finální text KAŽDÉHO nemlčeného unsolicited tahu vždycky, jinak o
@@ -185,12 +194,12 @@ export class ClaudeProcess {
         // jen tahle finální zpráva, ne streamované mezikroky výš, ať se historie
         // nenafoukne duplicitně. `logTurn`/statistika tahů se sem záměrně
         // nezahrnuje — tenhle tah nemá `usage` data z `runClaude`.
-        appendHistory("[cross-session/background událost]", text);
+        try {
+          appendHistory("[cross-session/background událost]", text);
+        } catch (err) {
+          console.error("Zápis unsolicited textu do chat_history.txt selhal:", err);
+        }
       }
-      if (text && text !== this.unsolicitedText && !isSilent) {
-        this.onUnsolicitedText?.(text);
-      }
-      this.unsolicitedText = "";
     }
   }
 
