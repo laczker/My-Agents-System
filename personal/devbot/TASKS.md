@@ -14,7 +14,27 @@ opraveno `git rebase main` bez konfliktů).
 
 Do budoucna: po každém `EnterWorktree` ověřit `git merge-base HEAD main`, a
 pokud se liší od `main`, rebasovat na lokální `main` dřív, než se začne
-implementovat — ne až u kontroly před checkpointem.
+implementovat — ne až u kontroly před checkpointem. (Zopakovalo se to znovu
+22.9. u iterace checkpoint-jako-PR, 28 commitů pozadu — postup zafungoval.)
+
+### Chybí `gh` CLI / GitHub token pro automatické otevření PR (zjištěno 22.9., iterace checkpoint-jako-PR)
+
+Nová checkpoint šablona (`META_BOT.md` §1a) počítá primárně s `gh pr create`.
+Ověřeno 22.9.: `gh` není na hostu nainstalovaný (`apt-cache policy gh` ukazuje
+kandidáta 2.46.0-4, ale instalace vyžaduje `apt-get install` a `sudo` selhává
+bez hesla — žádný root). V prostředí ani `.env*` souborech není žádný GitHub
+PAT/token (`GH_TOKEN`/`GITHUB_TOKEN`) — SSH klíč (`git@github.com`, účet
+`laczker`) funguje na `git push`, ale REST API pro vytvoření PR bez tokenu
+nejde. Dočasně používám fallback z §1a (push + GitHub compare URL s
+`?expand=1`, uživatel PR otevře jedním klikem) — funguje bez dalších závislostí,
+ale není to plně automatické "otevři PR" jako v zadání.
+
+Až bude vhodná chvíle: buď nainstalovat `gh` do uživatelského adresáře
+(standalone binárka z GitHub Releases, nepotřebuje root) a nastavit
+`gh auth login` s tokenem, který mi uživatel poskytne, nebo najít jinou cestu
+k REST API (PAT uložený v `.env`). Než se to vyřeší, `gh pr create` v §1a je
+aspirační cesta, fallback je reálná dnešní cesta — nepředstírat v checkpointech,
+že PR vznikl automaticky, když ve skutečnosti čeká na klik uživatele.
 
 ## Rozpracováno
 

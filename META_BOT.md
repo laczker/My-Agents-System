@@ -166,6 +166,44 @@ samotným, ne nad odděleným adresářem — na rozdíl od `fbalbums` výš. Ri
 nízkou autonomii pro cokoliv, co by restartovalo/zastavilo proces jiného bota nebo
 zasáhlo do sdíleného crontabu (viz `personal/devbot/CLAUDE.md`).
 
+## 1a. Vývojový cyklus projektových botů — checkpoint jako GitHub PR (od 22.9.)
+
+`fbalbums` a `devbot` (a budoucí projektoví boti) používají stejný 5krokový cyklus
+(analytik → schválení specu → vývojář ve worktree → `/code-review` → checkpoint →
+merge), zapsaný v každém bota vlastním `CLAUDE.md` (`personal/fbalbums/CLAUDE.md`,
+`personal/devbot/CLAUDE.md`, sekce "Vývojový cyklus"). Tahle sekce upřesňuje jen
+krok checkpointu (dřív "spec + diff + review nálezy vlepené do chatu") — zbytek
+cyklu je beze změny.
+
+- **Checkpoint = skutečný GitHub PR, ne diff v chatu.** Po dokončení
+  `/code-review` (krok 3) pushni branch na `origin` a otevři PR proti `main`
+  daného repa (`gh pr create`, pokud je `gh` CLI s nastaveným auth k dispozici).
+  Podmínka: repo musí mít GitHub remote — `agent-system` (`devbot`) ho má,
+  `/home/agent/fbalbums` k 22.9. zatím ne (rozhodnuto 25.8., jiné secrets/
+  expozice/životnost, viz §1 výš). Dokud fbalbums remote nemá, jeho checkpoint
+  zůstává diff-v-chatu; PR šablona se na něj zapne až/pokud remote přibude —
+  samostatné budoucí rozhodnutí, ne vedlejší efekt téhle změny.
+- **Fallback bez `gh` CLI** (stav `devbot` k 22.9.: `gh` není nainstalovaný,
+  žádný root/sudo pro `apt-get install gh`, žádný GitHub PAT/token v prostředí
+  — jen SSH klíč, který stačí na `git push`, ne na GitHub REST API): pushni
+  branch a do checkpointu dej GitHub "compare" URL
+  (`https://github.com/<owner>/<repo>/compare/main...<branch>?expand=1`) —
+  ukáže plný diff view na GitHubu rovnou a tlačítko "Create pull request" PR
+  otevře jedním klikem z mobilu. Až bude `gh auth login`/PAT k dispozici
+  (viz `TASKS.md`), přejít na skutečné `gh pr create` bez dalšího rozhodování.
+- **Do Telegram chatu jde jen odkaz** (PR nebo compare URL) **+ krátké shrnutí**
+  (co, proč, na co se zaměřit při review) **+ rozhodovací výzva** ("merguj" /
+  "ještě over X") — ne celý diff vlepený textem. Diff samotný čte uživatel na
+  GitHubu, ne v Telegramu.
+- **Pro větší změny**, které chce uživatel reálně vyzkoušet lokálně (ne jen
+  přečíst diff), přidej do checkpointu i přesný postup ke stažení
+  (`git fetch origin <branch> && git checkout <branch>`).
+- **Volba modelu per subagent role** (analytik/vývojář/reviewer) — viz §2a
+  níž, doporučení, ne povinnost.
+- Merge (krok 5) beze změny v principu, jen mechanika: po schválení `gh pr
+  merge` (nebo lokální merge, pokud PR nejde otevřít automaticky) branch do
+  `main`, worktree zavřít.
+
 ## 2a. Přiřazování modelu botovi/subagentovi
 
 Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
@@ -186,6 +224,14 @@ Pravidlo pro volbu při zakládání bota:
 - Subagenti spuštění přes `Agent` tool (uvnitř jednoho bota) mají svůj vlastní
   `model` parametr na úrovni jednoho volání — to je nezávislé na `CLAUDE_MODEL`
   bota a řeší se výběrem modelu pro konkrétní subagentní úkol, ne globálně.
+- **Doporučení (ne povinnost) pro role ve vývojovém cyklu projektových botů**
+  (§1a): analytik a reviewer dělají plánování/kvalitativní posouzení, kde se
+  chyba draho vrací (špatný spec nebo přehlédnutý bug jde dál do checkpointu)
+  — silnější model (`sonnet`/`opus`) dává smysl jako default. Vývojářský krok
+  (mechanické psaní kódu podle už schváleného specu) je kandidát na levnější
+  model (`haiku`), pokud jde o menší/dobře specifikovanou iteraci — u
+  komplexnější implementace zůstat na `sonnet`. Rozhodnutí per iterace, ne
+  jednou navždy nastavené globálně.
 
 ## 3. Konvence, které musí mít KAŽDÝ nový bot v `CLAUDE.md` (vynucené incidenty, ne teorie)
 

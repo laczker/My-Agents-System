@@ -64,12 +64,19 @@ Telegram chatu — nezačínej rovnou kódovat bez schváleného specu.
    `/home/agent/agent-system`, vlastní branch.
 3. **Reviewer** — `/code-review` jako automatický předfiltr nad diffem z
    worktree.
-4. Sesbírej spec + diff + review nálezy do **jednoho konsolidovaného
-   checkpointu** a pošli uživateli do tohohle Telegram chatu ke schválení
-   (OK / oprav / zamítni). Mezi kroky 1–4 se uživatele neptej znovu — dvě
-   brány na iteraci (spec, checkpoint) jsou domluvený a záměrný počet,
-   nepřidávat další "pro jistotu".
-5. Po schválení: merge branch do `main` v `/home/agent/agent-system`, worktree
+4. Checkpoint = **GitHub PR** (`META_BOT.md` §1a), ne diff vlepený do chatu:
+   pushni branch na `origin`, otevři PR proti `main` (`gh pr create`, pokud je
+   `gh` CLI s auth k dispozici; jinak fallback — push + GitHub "compare" URL
+   `https://github.com/<owner>/<repo>/compare/main...<branch>?expand=1`, viz
+   `TASKS.md`). Do tohohle Telegram chatu jde jen odkaz (PR/compare URL) +
+   krátké shrnutí (co, proč, na co se zaměřit) + rozhodovací výzva ("merguj" /
+   "ještě over X") ke schválení (OK / oprav / zamítni) — ne celý diff textem.
+   U větších změn, které chce uživatel reálně vyzkoušet lokálně, přidej i
+   `git fetch origin <branch> && git checkout <branch>`. Mezi kroky 1–4 se
+   uživatele neptej znovu — dvě brány na iteraci (spec, checkpoint) jsou
+   domluvený a záměrný počet, nepřidávat další "pro jistotu".
+5. Po schválení: `gh pr merge` (nebo lokální merge, pokud PR nejde otevřít
+   automaticky) branch do `main` v `/home/agent/agent-system`, worktree
    zavřít, restart dotčených procesů přes `watchdog.sh` konvenci (ne ručně),
    ověřit heartbeaty, další iterace.
 
