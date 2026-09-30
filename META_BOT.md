@@ -1,24 +1,24 @@
 # Poznámky pro budoucího meta-bota (bota, co zakládá další boty)
 
 > Doplňuje `ARCHITEKTURA.md` (sekce 10 „Orchestrator”, sekce 13 „Persistent context”).
-> Tam je původní záměr/vize, tady je **jak systém reálně funguje ke dni 2026-09-07**
+> Tam je původní záměr/vize, tady je **jak systém reálně funguje ke dni 2026-09-22**
 > a jaké konvence si dosavadní boti (assistant, zpravodaj, mailista, joby, nakup,
-> fbalbums, devbot) postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a
+> fbalbums, devbot, trenér) postupně vynutily provozem. Až vznikne bot, který bude sám zakládat a
 > spouštět další boty, má tenhle soubor přečíst jako první — ušetří to
 > znovuobjevování stejných pravidel přes stejné incidenty.
 
 ## 1. Jak to vypadá dnes — diagram
 
 ```
-                    Uživatel (Telegram, 7 samostatných botů)
-      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup   @FbAlbums   @DevBot
-            │            │            │            │          │         │         │
-      ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐┌─▼─────────┐┌─▼─────────┐
-      │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
-      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  ││ (fbalbums)││ (devbot)  │
-      │cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal│
-      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    ││ /fbalbums/ ││ /devbot/   │
-      └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
+                    Uživatel (Telegram, 8 samostatných botů)
+      @Assistant   @Zpravodaj   @Mailista   @HlidacJobu   @Nákup   @FbAlbums   @DevBot   @Trenér
+            │            │            │            │          │         │         │         │
+      ┌─────▼─────┐┌────▼──────┐┌────▼──────┐┌────▼──────┐┌──▼────────┐┌─▼─────────┐┌─▼─────────┐┌─▼─────────┐
+      │ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts ││ bridge-ts │
+      │(assistant)││(zpravodaj)││(mailista) ││  (joby)   ││  (nakup)  ││ (fbalbums)││ (devbot)  ││ (trener)  │
+      │cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal││cwd=personal│
+      │/assistant/ ││/zpravodaj/ ││/mailista/  ││ /joby/     ││ /nakup/    ││ /fbalbums/ ││ /devbot/   ││ /trener/   │
+      └─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘└─────┬─────┘
                     │  vlastní .env.<bot> token, vlastní
                     │  claude proces (stream-json, trvalý)
                     │  session_id.txt, chat_history.txt (fallback)
@@ -32,8 +32,8 @@
                               je zdroj minulých incidentů, viz §4)
 
   watchdog.sh (systémový cron, každou minutu)
-    hlídá heartbeat/pgrep 8 procesů: assistant, zpravodaj, mailista, joby, nakup,
-    fbalbums, devbot, dashboard → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
+    hlídá heartbeat/pgrep 9 procesů: assistant, zpravodaj, mailista, joby, nakup,
+    fbalbums, devbot, trener, dashboard → restartuje spadlý/zaseknutý, zapisuje důvod do dashboard.sqlite
 
   personal/dashboard/ (5. proces, čtecí web, Tailscale 100.108.179.97:8765)
     - stav botů (heartbeat), aktivita 24h, kvóta, log proklik, restart tlačítko
@@ -159,6 +159,14 @@ ale počítat s tím, že po skončení téhle session ho nejpozději do minuty 
 cron watchdog — to je ten mechanismus, který drží všechny ostatní boty naživu napříč
 sessions, ne ruční `nohup`.
 
+Potvrzeno znovu při zakládání `trener` (22.9.): přesně tohle se stalo — ruční `nohup`
+test zemřel s koncem session, watchdog do minuty nahodil nový proces. Během téhle
+výměny (starý proces ještě dobíhá/umírá, nový už zkouší `getUpdates`) grammY krátce
+hlásí `409 Conflict: terminated by other getUpdates request` a retry backoff
+(2s/4s/8s/16s/30s) — to je OČEKÁVANÝ, neškodný vedlejší efekt handoffu, ne chyba k
+řešení. Pokud po pár desítkách sekund přibude čerstvý `heartbeat_ts.txt` bez dalšího
+konfliktu v logu, bot je v pořádku a nic se nemusí zasahovat ručně.
+
 **Stejná past u `Agent` toolu s `run_in_background: true`** (incident 7.9., `devbot`):
 každá příchozí Telegram zpráva spouští u `bridge-ts` bota novou `claude` invokaci
 (`--resume <session_id>`), ne jeden nekonečně běžící proces — konverzace přežívá
@@ -196,8 +204,8 @@ Statický `--model` flag per bot proces (`bridge-ts/src/claudeProcess.ts` čte
 podle úkolu uvnitř jednoho bota, stejný vzor, jaký používá Ludwigův bridge.
 Pravidlo pro volbu při zakládání bota:
 - **`sonnet` (default)** — běžný bot s průběžnou konverzací/rozhodováním
-  (assistant, zpravodaj, mailista, joby, nakup, fbalbums, devbot, budoucí
-  finanční/jazykový bot).
+  (assistant, zpravodaj, mailista, joby, nakup, fbalbums, devbot, trener,
+  budoucí finanční/jazykový bot).
   Neměnit bez konkrétního důvodu (kvalita rozhodování u citlivých úkolů, např.
   mailista maže/archivuje maily, jde o data).
 - **`opus`** — jen tam, kde jde primárně o hloubku/kvalitu jednorázového

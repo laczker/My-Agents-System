@@ -16,6 +16,70 @@ Do budoucna: po každém `EnterWorktree` ověřit `git merge-base HEAD main`, a
 pokud se liší od `main`, rebasovat na lokální `main` dřív, než se začne
 implementovat — ne až u kontroly před checkpointem.
 
+## Připomínky
+
+### `CLAUDE_CODE_OAUTH_TOKEN` (setup-token, crontab) — ověřit platnost ~15.9.2027 (zjištěno 21.9.)
+
+Sdílený token pro všech 7 produkčních procesů (`claude setup-token`, headless
+varianta) vznikl 15.9.2026 po incidentu s vypršením staré interaktivní
+`/login` session (`~/.claude/.credentials.json`, refresh token s vlastní
+expirací ~30 dní od založení v půlce srpna — to je to, co tehdy vypadlo).
+Podle dokumentace (code.claude.com/docs/en/authentication) má `setup-token`
+platnost cca 1 rok, tedy do ~15.9.2027 — ale token samotný (`sk-ant-oat01-...`)
+je neprůhledný, nikde na disku není jeho vlastní expirační timestamp k
+hlídání, takže to nejde ověřit proaktivně souborovou kontrolou (na rozdíl od
+staré `refreshTokenExpiresAt`). Navíc dokumentovaná roční platnost je zatím
+jen tvrzení z dokumentace, ne ověřený fakt (token v provozu teprve pár dní).
+
+Proto jen ruční připomínka, ne watchdog kontrola: zkontrolovat/obnovit token
+kolem 15.9.2027. Hlavní pojistka proti výpadku auth zůstává iterace B níž
+(process-level detekce ve watchdogu), která funguje nezávisle na tom, jestli
+tenhle konkrétní termín sedí.
+
+## Rozpracováno
+
+### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)
+
+Iterace A (hotovo) opravila, že OAuth výpadek se aktivně nahlásí místo tichého
+doručení jako běžný výsledek — ale jen v rámci `bridge-ts` procesu samotného.
+Watchdog na hostu dnes umí zjistit jen "proces neběží" (`pgrep`), ne "proces
+běží, ale je v `auth_error` smyčce" — to bylo v původním zadání jako bod 3,
+zůstává samostatná iterace (jiný typ řešení, bash health-check místo TS kódu).
+
+Zjištěno u review iterace A: `auth_error` detekce funguje jen na text z
+úspěšně vrácené `is_error` odpovědi. Pokud OAuth výpadek shodí `claude`
+proces rovnou (EOF na stdout, žádný `result` event), `runClaude` to vidí jen
+jako obecnou výjimku bez textu k rozpoznání — process-level detekce ve
+watchdogu (iterace B) tenhle případ pokryje, textová detekce v `bridge-ts`
+ne.
+
+### `handleUnsolicitedLine` posílá do Telegramu každý mezikrok zvlášť, ne až finální text (zjištěno 21.9.)
+
+Při rozboru ztráty kontextu (1ok2ok incident, 21.9.) se odhalilo, že
+`handleUnsolicitedLine` v `bridge-ts/src/claudeProcess.ts` (ř. 140–181) posílá
+do Telegramu (`broadcastMsg`) živě **každý `assistant` textový blok zvlášť**,
+ne až finální `result` — záměrný design (komentář v kódu, ř. 140–156) kvůli
+genuinním cross-session událostem (`SendMessage` od jiného bota, začátek/konec
+dávkové práce), kde by čekání na finální text ztratilo mezikroky.
+
+Problém: dokončení background subagenta (např. vývojář spuštěný na pozadí)
+prochází stejnou unsolicited větví. Když mezi voláními nástrojů napíšu
+pracovní poznámku, letí jako samostatná zpráva do Telegramu, i když se to
+snažím omezit na "intro + finální checkpoint" ([[feedback_devops_no_subagent_spam]]).
+`[TICHO]` prefix to potlačí, ale musel by být na doslova každém mezikroku
+zvlášť — křehké, snadno se to poruší (stalo se 21.9., 4 zprávy místo 1).
+Přímé odpovědi uživateli nejsou dotčené — ty jdou přes normální `send()`
+cestu v `index.ts`, kde se posílá jen jeden finální `outcome.text`.
+
+Souvisí s iterací "zápis unsolicited textu do `chat_history.txt`" (21.9.,
+stejný soubor/callback) — ale jde o oddělený problém (doručování do
+Telegramu vs. zápis do historie), řešit jako samostatnou budoucí iteraci se
+svým specem, ne rozšíření té právě běžící. Možný směr řešení (needomluveno):
+bufferovat unsolicited text a poslat souhrnně až na `result`/timeout, s
+výjimkou pro skutečně živé cross-session zprávy — potřeba rozmyslet, jak
+rozlišit "background dokončení mého vlastního subagenta" od "cizí bot mi
+něco poslal", než se z toho udělá spec.
+
 ## Odloženo
 
 ### `chat_history.txt` roste bez rotace, teď i rychleji (zjištěno 21.9., review iterace "zápis unsolicited textu do historie")
@@ -45,24 +109,26 @@ s neviditelnými znaky), `unescapeDelimiter` ho při čtení smaže, i když ho
 review nález "altitude" a zamítnutá alternativa v `DECISIONS.md`), ne další
 vrstva escapování. Sledovat, jestli se v praxi projeví.
 
-## Rozpracováno
+### Úklid komentářů v kódu — bez češtiny, bez AI komentářového balastu (zadáno 30.9.)
 
-### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)
+Uživatel chce před víkendovým review (chystá se otevřít kódovou základnu ve
+vlastním IDE a rozjet nad ní vlastní instanci Claude Code, aby si systém
+prošel) pročistit komentáře napříč celým systémem — žádné komentáře v
+češtině, žádný typický AI-generovaný komentářový balast (komentáře, co jen
+opakují, co už říká název funkce/proměnné). Dopadá na sdílený produkční kód
+napříč všemi boty (min. `bridge-ts`), ne jen na devbot — potřeba nejdřív
+rozmyslet rozsah (jen `bridge-ts/src`? i per-bot skripty/`CLAUDE.md`?) a
+napsat samostatný spec ke schválení, ne rovnou kódovat — stejná nízká
+autonomie jako ostatní iterace (sdílený provoz). Zařadit do fronty, pořadí
+zpracování vůči ostatním položkám fronty uživateli nezáleží (30.9.).
 
-Iterace A (hotovo) opravila, že OAuth výpadek se aktivně nahlásí místo tichého
-doručení jako běžný výsledek — ale jen v rámci `bridge-ts` procesu samotného.
-Watchdog na hostu dnes umí zjistit jen "proces neběží" (`pgrep`), ne "proces
-běží, ale je v `auth_error` smyčce" — to bylo v původním zadání jako bod 3,
-zůstává samostatná iterace (jiný typ řešení, bash health-check místo TS kódu).
+### Dockerfile.daily verze `claude` CLI neodpovídá hostiteli (zjištěno 30.9.)
 
-Zjištěno u review iterace A: `auth_error` detekce funguje jen na text z
-úspěšně vrácené `is_error` odpovědi. Pokud OAuth výpadek shodí `claude`
-proces rovnou (EOF na stdout, žádný `result` event), `runClaude` to vidí jen
-jako obecnou výjimku bez textu k rozpoznání — process-level detekce ve
-watchdogu (iterace B) tenhle případ pokryje, textová detekce v `bridge-ts`
-ne.
-
-## Odloženo
+Při přípravě upgradu sdíleného `claude` (host) na `2.1.280` zjištěno, že
+`Dockerfile.daily` má verzi připnutou na `2.1.233` — neodpovídá ani současné
+hostitelské `2.1.270` (mělo se bumpovat ručně při každé aktualizaci
+hostitele, minule se to zjevně přeskočilo). Sladit jako malou samostatnou
+iteraci až po dokončení probíhajícího hostitelského upgradu.
 
 ### Adresářový mount pro META_BOT.md/ARCHITEKTURA.md (zjištěno 15.9., iterace 3)
 
