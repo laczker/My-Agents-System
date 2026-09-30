@@ -10,9 +10,9 @@ import { logTurn } from "./turnLog.js";
 interface ClaudeResult {
   result: string;
   isError: boolean;
-  /** Vyplněno, pokud tenhle tah narazil na Claude usage limit (5h/týdenní kvóta)
-   * místo skutečné odpovědi — `resetsAtMs` je epoch ms, kdy se kvóta obnoví
-   * (null, pokud se čas nepodařilo zjistit ani ze strukturovaného eventu, ani z textu). */
+  /** Set if this turn hit the Claude usage limit (5h/weekly quota) instead of
+   * a real reply — `resetsAtMs` is the epoch ms when the quota resets
+   * (null if the time couldn't be determined from either the structured event or the text). */
   rateLimitedAt: { resetsAtMs: number | null } | null;
 }
 
@@ -22,9 +22,9 @@ export type RunClaudeOutcome =
   | { kind: "auth_error"; text: string }
   | { kind: "error"; text: string };
 
-// Jediný známý vzor (incident 14.9.): "Failed to authenticate: OAuth session
-// expired and could not be refreshed" — oba regexy musí sednout zároveň, ať
-// nechytáme jiné auth chyby (např. špatný API klíč), co OAuth nezmiňují.
+// The only known pattern so far (incident 14.9.): "Failed to authenticate: OAuth
+// session expired and could not be refreshed" — both regexes must match together, so
+// we don't catch other auth errors (e.g. a bad API key) that don't mention OAuth.
 const OAUTH_ERROR_PATTERN = /oauth/i;
 const AUTH_FAILURE_PATTERN = /expired|authenticat/i;
 
@@ -32,13 +32,13 @@ function looksLikeAuthError(text: string): boolean {
   return OAUTH_ERROR_PATTERN.test(text) && AUTH_FAILURE_PATTERN.test(text);
 }
 
-/** Prefix, kterým bot může začít text unsolicited tahu, aby se NEODESLAL do
- * Telegramu (viz `handleUnsolicitedLine`). Sdílené napříč všemi profily bota. */
+/** Prefix a bot can start an unsolicited turn's text with so it does NOT get sent
+ * to Telegram (see `handleUnsolicitedLine`). Shared across all bot profiles. */
 export const SILENT_MARKER = "[TICHO]";
 
-// Trvale běžící `claude` proces (stream-json na stdin/stdout), stejný vzor jako
-// bridge.py — jeden proces drží kontext nativně mezi zprávami, `--resume` slouží jen
-// jako záchranná síť po pádu, ne jako běžná cesta. Viz DECISIONS.md, 17.8.
+// A permanently running `claude` process (stream-json on stdin/stdout), same pattern
+// as bridge.py — one process holds context natively across messages, `--resume` only
+// serves as a safety net after a crash, not as the normal path. See DECISIONS.md, 17.8.
 export class ClaudeProcess {
   private proc: ChildProcess | null = null;
   private rl: ReturnType<typeof createInterface> | null = null;
@@ -46,31 +46,32 @@ export class ClaudeProcess {
   private waiters: Array<(line: string | null) => void> = [];
   private lastContextTokens = 0;
   private cycleRequested = false;
-  // True jen mezi zápisem na stdin v `send()` a jejím vrácením — mimo tenhle
-  // interval nikdo neplive stdout, takže cokoliv přijde, je z tahu, který si
-  // vyžádal někdo jiný než `send()` (viz `handleUnsolicitedLine`).
+  // True only between the stdin write in `send()` and its return — outside that
+  // window nobody is spewing stdout on our behalf, so anything that arrives is from
+  // a turn requested by someone other than `send()` (see `handleUnsolicitedLine`).
   private expectingResponse = false;
   private unsolicitedText = "";
 
-  /** `bridge-ts` volá `send()` jen pro zprávy z Telegramu. Cross-session zprávy
-   * (`SendMessage` od jiného bota) doručuje runtime přímo do běžícího `claude`
-   * procesu mimo tenhle kanál — proces na ně sám odpoví tahem, jehož JSON eventy
-   * dorazí na STEJNÝ stdout, ale bez aktivního `send()`, co by na ně čekal. Bez
-   * rozlišení by takové řádky skončily v `lineQueue` a příští legitimní `send()`
-   * (pro doopravdy novou zprávu z Telegramu) by je mylně přečetl jako odpověď na
-   * SVOU otázku. Callback pak dostane finální text takového tahu, aby ho bridge
-   * mohl poslat do vlastního Telegram chatu bota — jinak by cross-session úkol
-   * zpracovaný mimo `send()` nebyl v Telegramu vidět vůbec. */
+  /** `bridge-ts` calls `send()` only for messages coming from Telegram. Cross-session
+   * messages (a `SendMessage` from another bot) are delivered by the runtime directly
+   * into the running `claude` process outside this channel — the process replies on
+   * its own with a turn whose JSON events land on the SAME stdout, but without an
+   * active `send()` waiting for them. Without this distinction such lines would end up
+   * in `lineQueue` and the next legitimate `send()` (for an actually new message from
+   * Telegram) would mistakenly read them as the reply to ITS OWN question. The callback
+   * then receives that turn's final text so the bridge can post it into the bot's own
+   * Telegram chat — otherwise a cross-session task handled outside `send()` would never
+   * be visible in Telegram at all. */
   constructor(private onUnsolicitedText?: (text: string) => void) {}
 
-  /** Součet cache_read + cache_creation + input tokenů z posledního `result`
-   * eventu — proxy pro to, kolik "stojí" připomenutí dosavadní historie. */
+  /** Sum of cache_read + cache_creation + input tokens from the last `result`
+   * event — a proxy for how much "recalling" the history so far "costs". */
   getLastContextTokens(): number {
     return this.lastContextTokens;
   }
 
-  /** Naplánuje čerstvou (ne `--resume`) session před ZAČÁTKEM příští zprávy —
-   * ne uprostřed aktuální, ať se neztratí rozpracovaná odpověď. */
+  /** Schedules a fresh (non-`--resume`) session before the START of the next
+   * message — not in the middle of the current one, so an in-progress reply isn't lost. */
   requestCycle(): void {
     this.cycleRequested = true;
   }
@@ -99,13 +100,13 @@ export class ClaudeProcess {
       stdio: ["pipe", "pipe", stderrFd],
     });
     this.proc = proc;
-    // `kill()` posílá SIGTERM, ale starý proces doopravdy skončí až za chvíli —
-    // jeho 'exit'/'line' eventy proto mohou dorazit PO tom, co `start()` už
-    // nastavil `this.proc` na nový proces. Bez tyhle identity kontroly by
-    // takový pozdní 'exit' ze starého procesu sebral čekatele (waiter) patřícího
-    // odpovědi nového procesu a `send()` by vyhodil falešné "EOF" — přesně tahle
-    // race způsobovala EOF chyby při proaktivním cyklení session i při restartu
-    // po pádu, i když nový proces běžel v pořádku.
+    // `kill()` sends SIGTERM, but the old process actually terminates only a bit later —
+    // its 'exit'/'line' events can therefore arrive AFTER `start()` has already set
+    // `this.proc` to the new process. Without this identity check, such a late 'exit'
+    // from the old process would grab a waiter belonging to the new process's reply,
+    // and `send()` would throw a false "EOF" — this exact race caused EOF errors both
+    // during proactive session cycling and during restart-after-crash, even though the
+    // new process was running fine.
     this.lineQueue = [];
     this.waiters = [];
     this.expectingResponse = false;
@@ -137,23 +138,23 @@ export class ClaudeProcess {
     }
   }
 
-  /** Posílá text z tahu, který nikdo přes `send()` nevyžádal (typicky reakce na
-   * cross-session zprávu), do vlastního Telegram chatu bota — živě, po každém
-   * `assistant` bloku, ne až na `result`. Jeden takový tah může mít víc kroků
-   * (text → nástroj → text → ... → result) a dřívější verze posílala jen ten
-   * poslední kus textu před `result` — mezikroky (např. "dostal jsem úkol od X",
-   * "zpracovávám: ...") tiše zmizely. Dedupe přes `unsolicitedText` brání dvojímu
-   * odeslání stejného textu, když `result.result` jen zopakuje poslední `assistant`
-   * blok.
+  /** Sends the text of a turn nobody requested through `send()` (typically a reaction
+   * to a cross-session message) into the bot's own Telegram chat — live, after every
+   * `assistant` block, not only at `result`. Such a turn can have several steps
+   * (text → tool → text → ... → result), and an earlier version only sent the last
+   * chunk of text before `result` — intermediate steps (e.g. "got a task from X",
+   * "working on: ...") silently disappeared. Dedup via `unsolicitedText` prevents
+   * sending the same text twice when `result.result` just repeats the last
+   * `assistant` block.
    *
-   * Výjimka: text začínající `SILENT_MARKER` se do Telegramu neposílá vůbec
-   * (marker se ořízne, zbytek zahodí). Slouží pro rutinní, opakované unsolicited
-   * tahy (typicky `CronCreate` probuzení uprostřed vlastní dávkové smyčky, např.
-   * mailistino noční čištění schránky), kde by živé posílání KAŽDÉHO probuzení
-   * do Telegramu bylo jen spam — na rozdíl od genuinní cross-session viditelnosti
-   * (SendMessage od jiného bota, začátek/konec dávkové práce, eskalace), která má
-   * dál chodit živě beze změny. Bota nic nenutí marker použít — je to nástroj pro
-   * bota, ne bezpečnostní mechanismus. Viz META_BOT.md. */
+   * Exception: text starting with `SILENT_MARKER` is not sent to Telegram at all
+   * (the marker is stripped, the rest discarded). This is for routine, repeated
+   * unsolicited turns (typically a `CronCreate` wakeup in the middle of a bot's own
+   * batch loop, e.g. mailista's nightly mailbox cleanup), where live-posting EVERY
+   * wakeup to Telegram would just be spam — unlike genuine cross-session visibility
+   * (a SendMessage from another bot, start/end of batch work, escalation), which
+   * should keep going out live unchanged. Nothing forces a bot to use the marker —
+   * it's a tool for the bot, not a security mechanism. See META_BOT.md. */
   private handleUnsolicitedLine(line: string | null): void {
     if (line === null) return;
     const trimmed = line.trim();
@@ -179,21 +180,21 @@ export class ClaudeProcess {
       }
     }
     if (obj.type === "result") {
-      // `obj.result` bývá i ne-stringový (pozorováno v praxi) — pro broadcast se
-      // pak nic neposílá (dřívější `assistant` blok už live odešel), ale pro
-      // zápis do historie se použije poslední streamovaný `assistant` text
-      // (`this.unsolicitedText`) jako fallback, stejně jako `send()` cesta níž
-      // padá na `lastAssistantText` — jinak by se tenhle tah v historii ztratil
-      // úplně, přesně ten incident, co tahle iterace řeší.
+      // `obj.result` is sometimes non-string too (observed in practice) — in that
+      // case nothing gets broadcast (the earlier `assistant` block already went out
+      // live), but for the history write the last streamed `assistant` text
+      // (`this.unsolicitedText`) is used as a fallback, same as the `send()` path
+      // below falling back to `lastAssistantText` — otherwise this turn would be lost
+      // from history entirely, exactly the incident this iteration fixes.
       const rawText = typeof obj.result === "string" ? obj.result : "";
       const historyText = rawText || this.unsolicitedText;
       const isSilent = historyText.trimStart().startsWith(SILENT_MARKER);
       const shouldNotify = Boolean(rawText) && rawText !== this.unsolicitedText && !isSilent;
-      // Reset jde první a je čistě v paměti (nemůže selhat) — Telegram broadcast
-      // a zápis do historie níž oba dělají I/O nezávisle na sobě, aby selhání
-      // jednoho (výpadek Telegram API; zápis do souboru už si guard řeší sám
-      // uvnitř `appendHistory`) neshodilo to druhé ani nezanechalo dedup stav
-      // zaseklý na starém textu.
+      // The reset happens first and is purely in-memory (can't fail) — the Telegram
+      // broadcast and the history write below both do I/O independently of each other,
+      // so a failure in one (Telegram API outage; the file write already guards itself
+      // inside `appendHistory`) doesn't take down the other or leave the dedup state
+      // stuck on the old text.
       this.unsolicitedText = "";
       if (shouldNotify) {
         try {
@@ -203,15 +204,16 @@ export class ClaudeProcess {
         }
       }
       if (historyText && !isSilent) {
-        // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce výš (ta řeší
-        // jen to, aby se do Telegramu neposlal stejný text dvakrát, když
-        // `result.result` zopakuje poslední `assistant` blok) — do historie musí
-        // jít finální text KAŽDÉHO nemlčeného unsolicited tahu vždycky, jinak o
-        // něm agent po pozdějším cyklení kontextu (seed jen z `chat_history.txt`)
-        // neví nic (incident: takhle se ztratil celý schválený spec). Zapisuje se
-        // jen tahle finální zpráva, ne streamované mezikroky výš, ať se historie
-        // nenafoukne duplicitně. `logTurn`/statistika tahů se sem záměrně
-        // nezahrnuje — tenhle tah nemá `usage` data z `runClaude`.
+        // Writing to `chat_history.txt` is INDEPENDENT of the dedup condition above
+        // (that one only prevents sending the same text to Telegram twice when
+        // `result.result` repeats the last `assistant` block) — the final text of
+        // EVERY non-silent unsolicited turn must always go into history, otherwise
+        // the agent knows nothing about it after a later context cycle (seeded only
+        // from `chat_history.txt`) — incident: this is how an entire approved spec
+        // got lost. Only this final message is written, not the streamed intermediate
+        // steps above, so history doesn't bloat with duplicates. `logTurn`/turn
+        // statistics are deliberately not included here — this turn has no `usage`
+        // data from `runClaude`.
         appendHistory("[cross-session/background událost]", historyText);
       }
     }
@@ -241,12 +243,12 @@ export class ClaudeProcess {
     try {
       this.proc?.kill();
     } catch {
-      // proces už neběží, nic k řešení
+      // process already isn't running, nothing to handle
     }
   }
 
-  /** Pošle jednu zprávu a čeká na {"type":"result"}. Vrací i poslední zachycený
-   * dílčí text asistenta, pro případ, že proces spadne dřív, než dorazí result. */
+  /** Sends one message and waits for {"type":"result"}. Also returns the last
+   * captured partial assistant text, in case the process crashes before result arrives. */
   async send(promptText: string, timeoutMs = CLAUDE_TURN_TIMEOUT_MS): Promise<ClaudeResult> {
     if (!this.proc) throw new Error("claude proces není nastartovaný");
     this.expectingResponse = true;
@@ -279,13 +281,14 @@ export class ClaudeProcess {
 
       if (line === TIMED_OUT) {
         cancel();
-        // Timeout tady jen znamená, že BRIDGE přestal čekat — `claude` proces samotný
-        // dál běží a časem stejně vyprodukuje `result`. Bez zabití by ten výsledek
-        // zůstal viset v `lineQueue`/`waiters` a "ukradl" by ho úplně JINÝ, pozdější
-        // `send()` volaný pro DALŠÍ (nesouvisející) zprávu od uživatele — odpověď by
-        // se pak spárovala se špatnou otázkou (a `isAlive()` by mylně hlásil živý
-        // proces, takže by se pro tu další zprávu vůbec nezaložila čerstvá session).
-        // Zabitím tady se `isAlive()` po timeoutu spolehlivě vrátí `false`.
+        // A timeout here just means the BRIDGE stopped waiting — the `claude` process
+        // itself keeps running and will eventually produce a `result` anyway. Without
+        // killing it, that result would stay stuck in `lineQueue`/`waiters` and get
+        // "stolen" by a completely DIFFERENT, later `send()` call for the NEXT
+        // (unrelated) message from the user — the reply would then get paired with the
+        // wrong question (and `isAlive()` would falsely report a live process, so no
+        // fresh session would be started for that next message at all). Killing it here
+        // makes `isAlive()` reliably return `false` after a timeout.
         this.kill();
         break;
       }
@@ -308,8 +311,8 @@ export class ClaudeProcess {
         if (text) lastAssistantText = text;
       }
 
-      // Strukturovaný signál, že tenhle tah narazil na kvótu (5h/týdenní) — spolehlivější
-      // než parsování textu, obsahuje přesný `resetsAt` (epoch, viz normalizeResetsAt).
+      // A structured signal that this turn hit the quota (5h/weekly) — more reliable
+      // than parsing text, contains the exact `resetsAt` (epoch, see normalizeResetsAt).
       if (obj.type === "rate_limit_event" && obj.rate_limit_info?.status === "rejected") {
         const resetsAt = obj.rate_limit_info?.resetsAt;
         structuredResetsAtMs = typeof resetsAt === "number" ? normalizeResetsAt(resetsAt) : null;
@@ -358,15 +361,16 @@ function buildSeedPrompt(userText: string, downloadedFileInfo: string): string {
   );
 }
 
-/** Posílá zprávy do trvale běžícího procesu. Tři cesty na "novou" session:
- * (1) proaktivní cyklení — `usage` z předchozího tahu přesáhl
- * `CONTEXT_CYCLE_THRESHOLD_TOKENS`, založí se čerstvá session PŘED touhle zprávou
- * (ne uprostřed předchozí), ať neroste cena/kvóta za tah donekonečna;
- * (2) pád/timeout — jeden pokus o restart s `--resume`;
- * (3) pokud selže i to, čistě nová session s textovou historií jako fallback
- * kontextu (stejný mechanismus jako `bridge.py`). Ve všech třech případech, kde se
- * nezachovává `--resume`, se prompt seedne `chat_history.txt`, takže se navenek nic
- * neztrácí — trvalé znalosti (`DECISIONS.md`/`TASKS.md`) stejně žijí v souborech. */
+/** Sends messages to the permanently running process. Three paths to a "new" session:
+ * (1) proactive cycling — the previous turn's `usage` exceeded
+ * `CONTEXT_CYCLE_THRESHOLD_TOKENS`, a fresh session is started BEFORE this message
+ * (not in the middle of the previous one), so the cost/quota per turn doesn't grow
+ * forever;
+ * (2) crash/timeout — one restart attempt with `--resume`;
+ * (3) if that fails too, a completely new session with the text history as a context
+ * fallback (same mechanism as `bridge.py`). In all three cases where `--resume` isn't
+ * preserved, the prompt is seeded from `chat_history.txt`, so nothing is lost from the
+ * outside — persistent knowledge (`DECISIONS.md`/`TASKS.md`) lives in files anyway. */
 export async function runClaude(cp: ClaudeProcess, userText: string, downloadedFileInfo: string): Promise<RunClaudeOutcome> {
   let prompt = `${downloadedFileInfo}${userText}`;
 
@@ -382,9 +386,10 @@ export async function runClaude(cp: ClaudeProcess, userText: string, downloadedF
 
   try {
     const { result, isError, rateLimitedAt } = await cp.send(prompt);
-    // Kvóta se neobnoví tím, že hned zkusíme znovu — na rozdíl od skutečných chyb
-    // se restart/retry s tímhle stavem přeskakuje, ať se limit nezkouší zbytečně
-    // podruhé; volající (processQueue) úkol nechá ve frontě a zkusí ho sám po resetu.
+    // The quota doesn't come back just because we try again right away — unlike real
+    // errors, restart/retry is skipped for this state, so we don't hit the limit a
+    // second time for nothing; the caller (processQueue) leaves the task in the queue
+    // and retries it itself after the reset.
     if (rateLimitedAt) return { kind: "rate_limited", resetsAtMs: rateLimitedAt.resetsAtMs };
     if (!isError) return { kind: "ok", text: result };
   } catch (e) {

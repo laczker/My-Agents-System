@@ -1,11 +1,11 @@
 #!/bin/bash
-# Nasazuje dvě opravy najednou do bridge-ts (sdílený engine pro assistant i
-# zpravodaj): (1) race condition v ClaudeProcess (kill()+start() nechávaly
-# staré 'exit' eventy krást waitery nového procesu -> falešné EOF chyby při
-# cyklení session i restartu po pádu), (2) retry/backoff na 409 Conflict při
-# startu Telegram long-pollingu. Restartuje OBĚ instance (assistant i
-# zpravodaj běží ze stejného zdrojáku), sekvenčně s prodlevou, ať se
-# nekoliduje na getUpdates hned po sobě.
+# Deploys two fixes at once into bridge-ts (shared engine for assistant and
+# zpravodaj): (1) a race condition in ClaudeProcess (kill()+start() let stale
+# 'exit' events steal the new process's waiters -> false EOF errors during
+# session cycling and restart-after-crash), (2) retry/backoff on 409 Conflict
+# when starting the Telegram long-polling. Restarts BOTH instances (assistant
+# and zpravodaj run from the same source), sequentially with a delay, to
+# avoid colliding on getUpdates right after each other.
 LOG=/home/agent/agent-system/bridge_ts_switch.log
 
 crontab -l > /home/agent/agent-system/crontab_backup.txt

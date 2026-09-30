@@ -3,8 +3,8 @@ import path from "node:path";
 import { Bot } from "grammy";
 import { TELEGRAM_BOT_TOKEN, INBOX_DIR } from "./config.js";
 
-/** Stáhne přílohu (dokument/foto) do inboxu, stejné chování jako download_file
- * v bridge.py — vrací uloženou cestu, nebo popis chyby. */
+/** Downloads an attachment (document/photo) into the inbox, same behavior as
+ * `download_file` in bridge.py — returns the saved path, or an error description. */
 export async function downloadAttachment(
   bot: Bot,
   fileId: string,

@@ -7,20 +7,20 @@ const PAD_RIGHT = 16;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
 
-// Barvy podle dataviz skillu (dark mode, palette.md): kategoriální sloty 1-3
-// (modrá/oranžová/tyrkysová) pro identitu bota u jednotlivých tahů — tahle
-// trojice je jediná, co ve skillu projde all-pairs validací (4. slot dál by
-// kolidoval), takže dalšího bota nad tři je potřeba přidat jako nový slot a
-// znovu ověřit `validate_palette.js`, ne jen dobarvit. Status "critical"
-// (červená) pro naražení na limit — barva nikdy nenese význam sama, každá
-// tečka má i textový <title> tooltip a řádek v tabulce pod grafem.
+// Colors per the dataviz skill (dark mode, palette.md): categorical slots 1-3
+// (blue/orange/teal) for per-bot identity on individual turns — this triplet
+// is the only one in the skill that passes all-pairs validation (a 4th slot
+// would collide), so adding a bot beyond three needs a new slot plus a re-run
+// of `validate_palette.js`, not just picking another color. Status "critical"
+// (red) for hitting the rate limit — color never carries meaning on its own,
+// every dot also has a text <title> tooltip and a row in the table below the chart.
 const BOT_COLORS = ["#3987e5", "#d95926", "#199e70"];
-const COLOR_LINE = "#c3c2b7"; // sekundární ink — čára je součet, ne identita
+const COLOR_LINE = "#c3c2b7"; // secondary ink — the line is the total, not an identity
 const COLOR_HIT = "#e66767";
 const COLOR_GRID = "#2c2c2a";
 const COLOR_AXIS = "#383835";
 const COLOR_MUTED = "#898781";
-const COLOR_SURFACE_RING = "#1e293b"; // odpovídá bg-slate-800 panelu grafu
+const COLOR_SURFACE_RING = "#1e293b"; // matches the chart panel's bg-slate-800
 
 function fmtTokens(n: number): string {
   if (n >= 1000) return `${Math.round(n / 1000)}k`;
@@ -69,8 +69,8 @@ export function renderUsageChart(usage: UsageWindow, sinceTs: number, nowTs: num
     return `<text x="${x(ts).toFixed(1)}" y="${HEIGHT - 8}" text-anchor="middle" font-size="10" fill="${COLOR_MUTED}">${fmtDay(ts, span)}</text>`;
   }).join("");
 
-  // Hit-area v souladu s interaction.md — vizuální tečka je malá (r=4), ale
-  // hover cíl je transparentní kruh o průměru 24px kolem ní.
+  // Hit-area per interaction.md — the visible dot is small (r=4), but the
+  // hover target is a transparent circle 24px in diameter around it.
   const turnMarkers = usage.turns
     .map((t) => {
       const cx = x(t.ts).toFixed(1);
@@ -83,10 +83,10 @@ export function renderUsageChart(usage: UsageWindow, sinceTs: number, nowTs: num
     })
     .join("");
 
-  // Tenká vodorovná čára přes celou šířku grafu ve výšce naražení na limit —
-  // funguje jako prahová referenční čára, na kterou je vidět i pozdější body
-  // grafu (ne jen krátká čárka u samotného bodu), plus tečka v místě události
-  // pro tooltip s detailem.
+  // Thin horizontal line across the whole chart width at the height of the limit
+  // hit — acts as a threshold reference line that stays visible against later
+  // points too (not just a short mark at the point itself), plus a dot at the
+  // event location for the detail tooltip.
   const hitMarkers = usage.hits
     .map((h) => {
       const cx = Number(x(h.ts).toFixed(1));

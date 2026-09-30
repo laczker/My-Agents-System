@@ -46,9 +46,9 @@ const RANGE_PRESETS: Record<string, { label: string; ms: number }> = {
 };
 const DEFAULT_RANGE = "3d";
 
-// Fronta obsahuje surový uživatelský text (Telegram zpráva) — escapovat před
-// vložením do HTML, ať si uživatel/útočník nemůže poslat zprávu, co si vloží
-// vlastní markup do dashboardu.
+// The queue holds raw user text (a Telegram message) — escape before inserting
+// into HTML, so a user/attacker can't send a message that injects their own
+// markup into the dashboard.
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -251,13 +251,13 @@ export function startServer(): void {
         res.writeHead(404).end("Neznámý bot");
         return;
       }
-      // Stejný bezpečný postup jako ruční restart 18.8.: SIGTERM matchujícím
-      // procesům, skutečné nahození nechává na cron `watchdog.sh` (do minuty).
-      // pkill vrací exit 1, když nic nenajde — to není chyba, jen no-op.
+      // Same safe procedure as the manual restart on 18.8.: SIGTERM to matching
+      // processes, leaving the actual bring-up to the cron `watchdog.sh` (within a minute).
+      // pkill returns exit 1 when it finds nothing — that's not an error, just a no-op.
       try {
         execFileSync("pkill", ["-TERM", "-f", bot.killPattern]);
       } catch {
-        // no-op: proces už neběžel
+        // no-op: the process wasn't running
       }
       res.writeHead(303, { Location: "/" });
       res.end();

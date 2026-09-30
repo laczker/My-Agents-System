@@ -1,6 +1,6 @@
-// CLI vstup pro `watchdog.sh`: `npx tsx src/recordRestart.ts <bot> <reason>`.
-// Bash sám SQLite psát neumí (na hostu není nainstalované `sqlite3` CLI), takže
-// watchdog při každém restartu spustí tenhle skript místo přímého zápisu do DB.
+// CLI entry point for `watchdog.sh`: `npx tsx src/recordRestart.ts <bot> <reason>`.
+// Bash itself can't write SQLite (the host has no `sqlite3` CLI installed), so
+// the watchdog runs this script on every restart instead of writing to the DB directly.
 import { recordRestart } from "./db.js";
 
 const [bot, reason] = process.argv.slice(2);

@@ -1,16 +1,16 @@
-// Boti, které dashboard sleduje — ručně udržovaný seznam podle `bridge-ts/src/config.ts`
-// (BOT_DIR/heartbeat_ts.txt na bota) a `watchdog.sh` (pgrep pattern na bota). Nový bot
-// = nový řádek zde + nový blok ve `watchdog.sh`.
+// Bots the dashboard watches — manually maintained list matching `bridge-ts/src/config.ts`
+// (BOT_DIR/heartbeat_ts.txt per bot) and `watchdog.sh` (pgrep pattern per bot). A new bot
+// = a new line here + a new block in `watchdog.sh`.
 export interface BotDef {
   name: string;
   dir: string;
-  // Přesně stejný pgrep/pkill pattern jako v `watchdog.sh` — restart tlačítko posílá
-  // SIGTERM matchujícím procesům a spoléhá na to, že je cron watchdog do minuty
-  // zase nahodí (stejný bezpečný postup jako ruční restart 18.8.).
+  // Exactly the same pgrep/pkill pattern as in `watchdog.sh` — the restart button
+  // sends SIGTERM to matching processes and relies on the cron watchdog bringing
+  // it back up within a minute (same safe procedure as the manual restart on 18.8.).
   killPattern: string;
-  // `.env.<profil>` daného bota (viz bridge-ts/src/config.ts) — odsud se za běhu
-  // čte CLAUDE_MODEL, ať dashboard ukazuje skutečnou hodnotu, ne ručně duplikovanou
-  // kopii, která by se rozjela s realitou při příští změně env souboru.
+  // `.env.<profile>` for the bot (see bridge-ts/src/config.ts) — read at runtime to
+  // get CLAUDE_MODEL, so the dashboard shows the actual value instead of a manually
+  // duplicated copy that would drift from reality on the next env file change.
   envFile: string;
 }
 
@@ -24,14 +24,14 @@ export const BOTS: BotDef[] = [
   { name: "devbot", dir: "/home/agent/agent-system/personal/devbot", killPattern: "tsx src/index.ts devbot", envFile: "/home/agent/agent-system/.env.devbot" },
 ];
 
-// Heartbeat se zapisuje každých 15s (HEARTBEAT_INTERVAL_MS v bridge-ts/src/config.ts).
-// Práh > 2x ten interval, ať krátký zákmit při zápisu nevykreslí bota jako zaseknutého.
+// Heartbeat is written every 15s (HEARTBEAT_INTERVAL_MS in bridge-ts/src/config.ts).
+// Threshold is > 2x that interval, so a brief write hiccup doesn't render a bot as stuck.
 export const STALE_AFTER_MS = 60_000;
 
 export const DB_FILE = "/home/agent/agent-system/personal/dashboard/dashboard.sqlite";
 
-// Jen Tailscale rozhraní (tailnet) — dashboard nemá auth, viz DECISIONS.md.
-// Veřejné rozhraní (0.0.0.0) záměrně vynecháno, ať i při děravém/změněném
-// firewallu zůstane dashboard z veřejného internetu nedosažitelný.
+// Tailscale interface (tailnet) only — the dashboard has no auth, see DECISIONS.md.
+// The public interface (0.0.0.0) is deliberately omitted so the dashboard stays
+// unreachable from the public internet even with a leaky/misconfigured firewall.
 export const HOST = "100.108.179.97";
 export const PORT = 8765;

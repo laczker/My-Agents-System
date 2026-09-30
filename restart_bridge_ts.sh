@@ -1,7 +1,7 @@
 #!/bin/bash
-# Restart bridge-ts kvůli nasazení kódové změny (proaktivní cyklení session).
-# Normální restart, ne proaktivní cyklus — session_id.txt zůstává, --resume se
-# použije jako obvykle, kontext se nezahazuje.
+# Restart bridge-ts to deploy a code change (proactive session cycling).
+# Normal restart, not a proactive cycle — session_id.txt stays, --resume is
+# used as usual, context isn't discarded.
 LOG=/home/agent/agent-system/bridge_ts_switch.log
 
 crontab -l > /home/agent/agent-system/crontab_backup.txt
@@ -10,8 +10,9 @@ echo "$(date -Iseconds) [redeploy] cron watchdog docasne vypnut" >> "$LOG"
 
 sleep 60
 
-# Přesně najít claude subprocess, co je potomkem TÉHLE instance bridge-ts (ne
-# libovolný jiný "claude -p" proces na hostu) — přes shodu rodičovského PID.
+# Precisely find the claude subprocess that is a child of THIS bridge-ts
+# instance (not just any other "claude -p" process on the host) — via
+# matching the parent PID.
 CHAIN_PIDS=$(pgrep -f "src/index\.ts" | tr '\n' ' ')
 if [ -n "$CHAIN_PIDS" ]; then
   CLAUDE_PID=$(ps -eo pid,ppid,cmd | awk -v pids="$CHAIN_PIDS" '

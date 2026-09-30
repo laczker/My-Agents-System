@@ -1,7 +1,8 @@
 #!/bin/bash
-# Trvalé přepnutí produkce na bridge-ts. Cron watchdog se na dobu přepnutí vypne,
-# aby nenastal stejný 409 Conflict jako u testu (watchdog viděl "bridge.py neběží"
-# a nastartoval ho zpátky, zatímco TS verze už pollovala stejný token).
+# Permanent switch of production to bridge-ts. The cron watchdog is disabled
+# for the duration of the switch, to avoid the same 409 Conflict as during
+# the test (the watchdog saw "bridge.py isn't running" and started it back
+# up, while the TS version was already polling the same token).
 LOG=/home/agent/agent-system/bridge_ts_switch.log
 
 crontab -l > /home/agent/agent-system/crontab_backup.txt
@@ -23,9 +24,10 @@ sleep 2
 
 cat > /home/agent/agent-system/watchdog.sh << 'EOF'
 #!/bin/bash
-# Restartuje bridge-ts, pokud neběží. Náhrada za systemd Restart=always —
-# na hostu není dostupný root ani docker socket (viz DECISIONS.md), takže
-# supervize jede přes cron (crontab -e, spouští se každou minutu).
+# Restarts bridge-ts if it's not running. Replacement for systemd
+# Restart=always — root and the docker socket aren't available on the host
+# (see DECISIONS.md), so supervision runs via cron (crontab -e, runs every
+# minute).
 cd /home/agent/agent-system/bridge-ts || exit 1
 if ! pgrep -f "tsx src/index.ts" > /dev/null; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts neběží, restartuji" >> /home/agent/agent-system/watchdog.log

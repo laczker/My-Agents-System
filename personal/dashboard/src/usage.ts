@@ -1,7 +1,7 @@
-// Všichni tři boti běží pod stejným přihlášeným Claude účtem (žádný .env.<profil>
-// nemá vlastní ANTHROPIC_API_KEY, viz bridge-ts/src/config.ts) — sdílejí tedy jednu
-// usage kvótu. Proto se tady tahy ze všech `turn_log_ts.jsonl` souborů slévají do
-// jedné časové osy, ne počítají per bot.
+// All three bots run under the same logged-in Claude account (no .env.<profile> has its
+// own ANTHROPIC_API_KEY, see bridge-ts/src/config.ts) — so they share one usage
+// quota. That's why turns from all `turn_log_ts.jsonl` files are merged here into
+// a single timeline instead of counted per bot.
 import { readFileSync } from "node:fs";
 import type { BotDef } from "./config.js";
 
@@ -34,7 +34,7 @@ function readTurns(bot: BotDef): RawTurn[] {
     out.push({
       ts,
       bot: bot.name,
-      // Chybí u řádků zalogovaných před nasazením tohohle počítadla — bere se jako 0.
+      // Missing on lines logged before this counter was deployed — treated as 0.
       newTokens: Number(ev.newTokens) || 0,
       rateLimited: !!ev.rateLimited,
       resetsAtMs: typeof ev.resetsAtMs === "number" ? ev.resetsAtMs : null,
@@ -66,13 +66,13 @@ export interface UsageWindow {
   series: UsagePoint[];
   turns: TurnPoint[];
   hits: BurnPoint[];
-  /** Aktuální kumulativní součet na konci okna (poslední bod `series`) — pro stat number. */
+  /** Current cumulative sum at the end of the window (last point of `series`) — for the stat number. */
   total: number;
 }
 
-/** Kumulativní součet `newTokens` napříč boty od `sinceTs`, s resetem na 0 při
- * každém naražení na limit (`rateLimited: true`) — tím vznikne "pilovitý" průběh:
- * roste, dokud se kvóta nevyčerpá, pak spadne zpátky na nulu. */
+/** Cumulative sum of `newTokens` across bots since `sinceTs`, resetting to 0 on
+ * every limit hit (`rateLimited: true`) — this produces a "sawtooth" curve:
+ * grows until the quota is exhausted, then drops back to zero. */
 export function buildUsageWindow(bots: BotDef[], sinceTs: number): UsageWindow {
   const rawTurns = bots
     .flatMap(readTurns)

@@ -17,9 +17,10 @@ async function sendRaw(text: string, chatId: string): Promise<void> {
     try {
       await bot.api.sendMessage(chatId, chunk, { parse_mode: "Markdown" });
     } catch (e) {
-      // Claude negeneruje text čistě pro legacy Telegram Markdown (rozjeté/nepárové
-      // entity) — radši doručit syrový text než ho nechat spadnout do outboxu, kde
-      // by ho nová 400-permanent-error logika tiše zahodila (viz DECISIONS.md).
+      // Claude doesn't generate text strictly for legacy Telegram Markdown (unbalanced/
+      // unpaired entities) — better to deliver the raw text than let it fall into the
+      // outbox, where the new 400-permanent-error logic would silently drop it (see
+      // DECISIONS.md).
       if (e instanceof GrammyError && e.error_code === 400 && e.description.includes("can't parse entities")) {
         await bot.api.sendMessage(chatId, chunk);
       } else {
@@ -31,25 +32,25 @@ async function sendRaw(text: string, chatId: string): Promise<void> {
 
 const outbox = new Outbox(sendRaw);
 
-/** Odpověď na konkrétní zprávu/úkol — patří tomu, kdo se ptal, ne všem povoleným
- * chatům (relevantní jen u botů s víc než jedním chat ID). */
+/** A reply to a specific message/task — belongs to whoever asked, not to all allowed
+ * chats (relevant only for bots with more than one chat ID). */
 function sendMsg(text: string, chatId: string = TELEGRAM_CHAT_ID): void {
   outbox.enqueue(text, chatId);
 }
 
-/** Systémové zprávy bez vazby na konkrétní dotaz (start, rate limit, cross-session
- * upozornění) — ty se týkají všech, kdo s botem mluví, takže jdou na všechny
- * povolené chaty. U jednodochatového bota (`TELEGRAM_CHAT_IDS_EXTRA` nenastaveno)
- * je to jen jeden chat, beze změny chování. */
+/** System messages not tied to a specific query (start, rate limit, cross-session
+ * notifications) — these concern everyone who talks to the bot, so they go to all
+ * allowed chats. For a single-chat bot (`TELEGRAM_CHAT_IDS_EXTRA` unset) that's just
+ * one chat, no change in behavior. */
 function broadcastMsg(text: string): void {
   for (const chatId of TELEGRAM_CHAT_IDS) sendMsg(text, chatId);
 }
 
 const jobQueue: Job[] = [];
 let processing = false;
-// null = fronta se nečeká na kvótu. Jinak epoch ms, dokdy `processQueue()` odmítá
-// nový pokus (timer níž ho sám odblokuje) — nastaví se, jen když `runClaude` nahlásí
-// `rate_limited`, ne při běžných chybách.
+// null = the queue isn't waiting on the quota. Otherwise epoch ms until which
+// `processQueue()` refuses a new attempt (the timer below unblocks it on its own) —
+// set only when `runClaude` reports `rate_limited`, not for regular errors.
 let rateLimitResumeAtMs: number | null = null;
 let rateLimitTimer: NodeJS.Timeout | null = null;
 
@@ -57,13 +58,14 @@ function persistQueue(): void {
   saveQueueState({ jobs: jobQueue, rateLimitResumeAtMs });
 }
 
-/** Naplánuje automatické pokračování fronty po obnovení Claude usage limitu a
- * hned o tom (s místním časem obnovení) informuje uživatele — dřív se rozpracovaný
- * úkol jen tiše ztratil, jakmile limit hlášku vydal jako "výsledek". Při `isRestore`
- * (watchdog restartoval proces, limit pořád neuplynul) se nová zpráva NEPOSÍLÁ —
- * uživatel už byl informován při prvním zásahu do limitu a watchdog umí restartovat
- * i vícekrát za hodinu, což by jinak vedlo k duplicitním "pořád čekám" hláškám
- * (viz `watchdog.log`, historicky spam u uživatele).*/
+/** Schedules automatic continuation of the queue once the Claude usage limit resets,
+ * and immediately tells the user about it (with the local reset time) — before this,
+ * an in-progress task just silently got lost as soon as the limit message came back
+ * as a "result". With `isRestore` (the watchdog restarted the process, the limit
+ * still hasn't lapsed) the new message is NOT sent — the user was already informed
+ * on the first hit of the limit, and the watchdog can restart more than once per
+ * hour, which would otherwise lead to duplicate "still waiting" messages (see
+ * `watchdog.log`, historically spammed the user). */
 function enterRateLimitWait(resetsAtMs: number | null, isRestore = false): void {
   const resumeAt = resetsAtMs ?? Date.now() + RATE_LIMIT_FALLBACK_WAIT_MS;
   rateLimitResumeAtMs = resumeAt;
@@ -86,9 +88,10 @@ function enterRateLimitWait(resetsAtMs: number | null, isRestore = false): void 
   }, delay);
 }
 
-// Telegram "typing..." animace zmizí uživateli po ~5s, proto se musí opakovat po
-// dobu, co `runClaude` běží (klidně desítky minut). Chyba (výpadek sítě apod.) se
-// tiše ignoruje — jde o kosmetiku, nesmí shodit/zpozdit zpracování úkolu.
+// The Telegram "typing..." animation disappears for the user after ~5s, so it has to
+// be repeated for as long as `runClaude` runs (easily tens of minutes). An error
+// (network outage etc.) is silently ignored — it's cosmetic, must not crash/delay
+// task processing.
 function startTypingIndicator(chatId: string): NodeJS.Timeout {
   const tick = () => void bot.api.sendChatAction(chatId, "typing").catch(() => {});
   tick();
@@ -97,8 +100,9 @@ function startTypingIndicator(chatId: string): NodeJS.Timeout {
 
 async function processQueue(): Promise<void> {
   if (processing) return;
-  // Ještě se čeká na reset kvóty — timer výš to sám odblokuje, tenhle časný
-  // return jen brání tomu, aby nové příchozí zprávy mezitím bušily do limitu znovu.
+  // Still waiting for the quota reset — the timer above unblocks this on its own,
+  // this early return just prevents new incoming messages from hammering the limit
+  // again in the meantime.
   if (rateLimitResumeAtMs !== null && Date.now() < rateLimitResumeAtMs) return;
   processing = true;
   try {
@@ -110,10 +114,11 @@ async function processQueue(): Promise<void> {
       try {
         outcome = await runClaude(claudeProcess, job.userText, job.downloadedFileInfo);
       } catch (e) {
-        // Dřív tohle skončilo jako unhandledRejection z `void processQueue()` — jen
-        // se to zalogovalo, uživatel se to nedozvěděl a rozpracovaný výsledek (viz
-        // `neodpověděl včas (částečný text: ...)`) zmizel beze stopy. Job zůstává na
-        // začátku fronty (neshiftnutý), takže se zkusí znovu při další zprávě.
+        // Previously this ended up as an unhandledRejection from `void processQueue()`
+        // — it just got logged, the user never found out, and the in-progress result
+        // (see `neodpověděl včas (částečný text: ...)`) disappeared without a trace.
+        // The job stays at the head of the queue (not shifted off), so it's retried
+        // on the next message.
         const msg = e instanceof Error ? e.message : String(e);
         sendMsg(`⚠️ Tah selhal (${msg}). Úkol zůstává ve frontě, zkusím to znovu při další zprávě.`, jobChatId);
         return;
@@ -127,14 +132,15 @@ async function processQueue(): Promise<void> {
       jobQueue.shift();
       persistQueue();
       if (outcome.kind === "auth_error") {
-        // Netýká se jen tazatele — dokud auth nefunguje, neodpoví ani na další
-        // zprávy, proto broadcast všem povoleným chatům jako u rate limitu.
+        // Doesn't just concern the one who asked — as long as auth is broken, it won't
+        // respond to other messages either, hence broadcast to all allowed chats, same
+        // as for rate limiting.
         broadcastMsg(`🔐 Claude autentizace vypadla (OAuth session expired), úkol nedokončen: ${outcome.text}`);
         touchHeartbeat();
-        // Na rozdíl od rate_limited tu není časovač na obnovení — bez tohohle
-        // returnu by fronta hned zkusila i zbylé úkoly, každý s vlastním
-        // restart+retry (~30 min) a duplicitním broadcastem, i když auth
-        // nefunguje pro žádný z nich.
+        // Unlike rate_limited, there's no timer to resume here — without this return
+        // the queue would immediately try the remaining tasks too, each with its own
+        // restart+retry (~30 min) and duplicate broadcast, even though auth doesn't
+        // work for any of them.
         return;
       }
       if (outcome.kind === "error") {
@@ -150,10 +156,11 @@ async function processQueue(): Promise<void> {
   }
 }
 
-// `onUnsolicitedText`: reakce na cross-session zprávu (SendMessage od jiného
-// bota), kterou runtime doručil mimo `send()` — bez tohohle by taková reakce
-// (např. "⏳ Zpracovávám úkol od tebe...") nešla vidět nikde v Telegramu. Není
-// vázaná na konkrétní chat, co se ptal, proto broadcast na všechny povolené.
+// `onUnsolicitedText`: reaction to a cross-session message (a SendMessage from
+// another bot) that the runtime delivered outside `send()` — without this, such a
+// reaction (e.g. "Working on your task...") wouldn't be visible anywhere in
+// Telegram. It's not tied to a specific chat that asked, hence broadcast to all
+// allowed ones.
 const claudeProcess = new ClaudeProcess((text) => broadcastMsg(text));
 
 bot.on("message", async (ctx) => {
@@ -188,17 +195,18 @@ bot.on("message", async (ctx) => {
   const wasIdle = jobQueue.length === 0 && !processing;
   jobQueue.push({ userText, downloadedFileInfo, chatId });
   persistQueue();
-  // Typing indikátor (startTypingIndicator, spuštěný hned na začátku processQueue)
-  // se u některých klientů nezobrazuje v otevřené konverzaci (jen v seznamu chatů),
-  // proto vedle něj jede i textová hláška jako spolehlivá zpětná vazba.
+  // The typing indicator (startTypingIndicator, started right at the beginning of
+  // processQueue) doesn't show up in an open conversation on some clients (only in
+  // the chat list), so a text message runs alongside it as reliable feedback.
   if (wasIdle) {
     sendMsg(`⏳ Zpracovávám...`, chatId);
   } else {
     sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
   }
 
-  // Nečeká se na dokončení — handler se vrátí hned, aby grammY mohl přijmout další
-  // zprávu okamžitě, i když tahle ještě běží (řeší "neodpovídáš, když pošlu víc zpráv").
+  // Not waiting for completion — the handler returns immediately, so grammY can accept
+  // the next message right away even while this one is still running (fixes "you don't
+  // reply when I send several messages").
   void processQueue();
 });
 
@@ -206,13 +214,14 @@ bot.catch((err) => {
   console.error("Chyba v grammY handleru:", err);
 });
 
-// Telegram krátce po restartu (starý proces právě zabitý watchdogem/redeployem)
-// ještě chvíli drží předchozí long-poll spojení na stejný token — první getUpdates
-// pak dostane 409 Conflict. grammY tohle záměrně nezkouší samo (409 rethrowne, viz
-// bot.js handlePollingError) — u skutečné kolize dvou různých botů by tiché
-// opakování jen maskovalo problém. Tady ale víme, že jde o náš vlastní restart, ne
-// o cizí instanci, takže pár rychlých pokusů s narůstajícím čekáním obvykle stačí
-// místo čekání až minutu na cron watchdog.
+// Shortly after a restart (the old process just killed by the watchdog/a redeploy),
+// Telegram still holds the previous long-poll connection on the same token for a
+// while — the first getUpdates then gets a 409 Conflict. grammY deliberately doesn't
+// retry this itself (409 is rethrown, see bot.js handlePollingError) — for a real
+// collision between two different bots, silent retrying would just mask the problem.
+// Here, though, we know it's our own restart, not another instance, so a few quick
+// attempts with growing backoff are usually enough instead of waiting up to a minute
+// for the cron watchdog.
 const STARTUP_409_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000, 30_000];
 
 async function startPollingWithRetry(): Promise<void> {
@@ -239,16 +248,16 @@ function restoreQueueState(): void {
   if (state.rateLimitResumeAtMs === null) return;
 
   if (Date.now() >= state.rateLimitResumeAtMs) {
-    // Limit se stihl obnovit, zatímco bridge neběžel (pád/redeploy) — zpracuje se hned.
+    // The limit reset while the bridge wasn't running (crash/redeploy) — process right away.
     return;
   }
-  // Pořád se čeká — obnov i časovač, `main()` na konci volá `processQueue()`,
-  // který díky `rateLimitResumeAtMs` sám počká, dokud tenhle timer neodpálí.
+  // Still waiting — restore the timer too; `main()` calls `processQueue()` at the end,
+  // which, thanks to `rateLimitResumeAtMs`, waits on its own until this timer fires.
   enterRateLimitWait(state.rateLimitResumeAtMs, true);
 }
 
 async function main() {
-  await outbox.flush(); // doručí, co se nestihlo odeslat před posledním pádem/restartem
+  await outbox.flush(); // delivers whatever didn't get sent before the last crash/restart
   outbox.startRetryLoop();
   startHeartbeatLoop();
   claudeProcess.start(getSessionId());
@@ -270,12 +279,13 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-// Dřív bez tohohle: jakákoliv nezachycená chyba (např. odmítnutý promise někde
-// mimo hlavní handler) spadla celý proces (viz DECISIONS.md, pád 17.8. po
-// zakládání mailisty) — i uprostřed vícehodinového čekání na reset usage limitu,
-// kdy by to smazalo neuloženou frontu. Teď se jen zaloguje, proces běží dál;
-// `jobQueue`/`rateLimitResumeAtMs` navíc přežívají v `job_queue_ts.json`, takže i
-// kdyby přesto spadl, watchdog (cron, do minuty) ho nastartuje zpátky se stavem.
+// Previously without this: any uncaught error (e.g. a rejected promise somewhere
+// outside the main handler) crashed the entire process (see DECISIONS.md, crash on
+// 17.8. after setting up mailista) — even in the middle of an hours-long wait for the
+// usage limit reset, which would have wiped the unsaved queue. Now it's just logged
+// and the process keeps running; `jobQueue`/`rateLimitResumeAtMs` also survive in
+// `job_queue_ts.json`, so even if it crashed anyway, the watchdog (cron, within a
+// minute) restarts it with its state intact.
 process.on("unhandledRejection", (reason) => {
   console.error("Nezachycené odmítnutí promise:", reason);
 });
@@ -285,10 +295,10 @@ process.on("uncaughtException", (err) => {
 
 main().catch((e) => {
   console.error("Fatální chyba při startu:", e);
-  // `claudeProcess.start()` v main() proběhne PŘED pollováním Telegramu — pokud
-  // pollování nakonec selže (409 přetrvá i po retry), bez tohohle by `claude`
-  // subprocess zůstal osiřelý (ppid 1) a běžel dál naprázdno, protože sem
-  // nedojde SIGTERM handler, jen tenhle catch.
+  // `claudeProcess.start()` in main() runs BEFORE polling Telegram — if polling
+  // ultimately fails (409 persists even after retrying), without this the `claude`
+  // subprocess would be left orphaned (ppid 1) and keep running for nothing, because
+  // the SIGTERM handler isn't reached here, only this catch.
   claudeProcess.kill();
   process.exit(1);
 });

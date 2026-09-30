@@ -1,9 +1,11 @@
 #!/bin/sh
-# Spustí bridge-ts pro všech 5 denních botů v jednom kontejneru (Docker pilot,
-# iterace 1 — 2 kontejnery místo 1-na-bota, viz personal/devbot/CLAUDE.md).
-# "assistant" je profil bez argumentu (zpětná kompatibilita, viz config.ts).
-# SIGTERM/SIGINT se přepošle všem dětem, ať `docker compose stop`/`down` ukončí
-# i podprocesy čistě místo osiřelých `claude` subprocessů.
+# Starts bridge-ts for all 5 daily bots in a single container (Docker pilot,
+# iteration 1 — 2 containers instead of 1-per-bot, see personal/devbot/CLAUDE.md).
+# "assistant" is the profile with no argument (backward compatibility, see
+# config.ts).
+# SIGTERM/SIGINT is forwarded to all children, so `docker compose stop`/`down`
+# terminates the subprocesses cleanly instead of leaving orphaned `claude`
+# subprocesses.
 set -e
 cd /home/agent/agent-system/bridge-ts
 

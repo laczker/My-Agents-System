@@ -1,5 +1,5 @@
-// Čte `turn_log_ts.jsonl`, který si každý bot sám plní (bridge-ts/src/turnLog.ts).
-// Dashboard soubor jen čte a shrnuje — žádný zápis odsud.
+// Reads `turn_log_ts.jsonl`, which each bot fills in on its own (bridge-ts/src/turnLog.ts).
+// The dashboard only reads and summarizes the file — no writes from here.
 import { readFileSync } from "node:fs";
 import type { BotDef } from "./config.js";
 
