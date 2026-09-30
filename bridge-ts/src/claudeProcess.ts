@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { openSync } from "node:fs";
 import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS, CLAUDE_MODEL } from "./config.js";
 import { getSessionId, saveSessionId } from "./session.js";
-import { getHistory } from "./history.js";
+import { getHistory, appendHistory } from "./history.js";
 import { looksLikeRateLimitText, parseResetsAtFromText, normalizeResetsAt } from "./rateLimit.js";
 import { logTurn } from "./turnLog.js";
 
@@ -169,15 +169,51 @@ export class ClaudeProcess {
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
         this.unsolicitedText = text;
-        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
+        if (!text.trimStart().startsWith(SILENT_MARKER)) {
+          try {
+            this.onUnsolicitedText?.(text);
+          } catch (err) {
+            console.error("Telegram broadcast unsolicited textu selhal:", err);
+          }
+        }
       }
     }
     if (obj.type === "result") {
-      const text = obj.result;
-      if (text && text !== this.unsolicitedText) {
-        if (!text.trimStart().startsWith(SILENT_MARKER)) this.onUnsolicitedText?.(text);
-      }
+      // `obj.result` bývá i ne-stringový (pozorováno v praxi) — pro broadcast se
+      // pak nic neposílá (dřívější `assistant` blok už live odešel), ale pro
+      // zápis do historie se použije poslední streamovaný `assistant` text
+      // (`this.unsolicitedText`) jako fallback, stejně jako `send()` cesta níž
+      // padá na `lastAssistantText` — jinak by se tenhle tah v historii ztratil
+      // úplně, přesně ten incident, co tahle iterace řeší.
+      const rawText = typeof obj.result === "string" ? obj.result : "";
+      const historyText = rawText || this.unsolicitedText;
+      const isSilent = historyText.trimStart().startsWith(SILENT_MARKER);
+      const shouldNotify = Boolean(rawText) && rawText !== this.unsolicitedText && !isSilent;
+      // Reset jde první a je čistě v paměti (nemůže selhat) — Telegram broadcast
+      // a zápis do historie níž oba dělají I/O nezávisle na sobě, aby selhání
+      // jednoho (výpadek Telegram API; zápis do souboru už si guard řeší sám
+      // uvnitř `appendHistory`) neshodilo to druhé ani nezanechalo dedup stav
+      // zaseklý na starém textu.
       this.unsolicitedText = "";
+      if (shouldNotify) {
+        try {
+          this.onUnsolicitedText?.(rawText);
+        } catch (err) {
+          console.error("Telegram broadcast unsolicited textu selhal:", err);
+        }
+      }
+      if (historyText && !isSilent) {
+        // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce výš (ta řeší
+        // jen to, aby se do Telegramu neposlal stejný text dvakrát, když
+        // `result.result` zopakuje poslední `assistant` blok) — do historie musí
+        // jít finální text KAŽDÉHO nemlčeného unsolicited tahu vždycky, jinak o
+        // něm agent po pozdějším cyklení kontextu (seed jen z `chat_history.txt`)
+        // neví nic (incident: takhle se ztratil celý schválený spec). Zapisuje se
+        // jen tahle finální zpráva, ne streamované mezikroky výš, ať se historie
+        // nenafoukne duplicitně. `logTurn`/statistika tahů se sem záměrně
+        // nezahrnuje — tenhle tah nemá `usage` data z `runClaude`.
+        appendHistory("[cross-session/background událost]", historyText);
+      }
     }
   }
 

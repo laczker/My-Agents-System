@@ -114,3 +114,63 @@ funguje, zatímco by tiše mizel.
   problému, co menší adresářový mount vyřeší bezpečněji.
 
 **Date:** 2026-09-15
+
+## Kolize `---` delimiteru v `chat_history.txt`: escapovat při zápisu, ne měnit formát (iterace "zápis unsolicited textu do historie")
+
+**Decision:** `appendHistory` (`bridge-ts/src/history.ts`) escapuje literální
+`"---\n"` uvnitř zapisovaného textu vložením neviditelného zero-width space
+hned za trojici pomlček (`"---​\n"`), místo aby se měnil samotný
+formát/delimiter souboru.
+
+**Why:** Review 2. kola u týhle iterace našel, že `getHistory`/`appendHistory`
+dělí výměny přes doslovný `"---\n"`, a nová zápisová cesta z
+`handleUnsolicitedLine` typicky zapisuje Markdown-formátovaný text
+(specy/checkpointy s horizontálními linkami), takže kolize je prakticky
+pravděpodobnější než u běžných Telegram odpovědí — reprodukováno přímo (viz
+`TASKS.md`, teď smazaná položka "Odloženo"). Escapování při zápisu opravu
+izoluje na `appendHistory` bez dotčení `getHistory` ani formátu souboru na
+disku — žádná migrace zpětné kompatibility, žádný dopad na existující obsah
+`chat_history.txt` napříč 7 profily. Zero-width space je vizuálně neviditelný,
+takže se text v Telegramu ani při zpětném čtení historie nezmění.
+
+**Alternatives:**
+- Změnit delimiter na kolizi-odolnější řetězec (např. vlastní marker) —
+  zamítnuto pro tuhle iteraci: je to změna formátu souboru sdílená napříč
+  `history.ts` a všemi 7 profily, vyžadovala by řešit zpětnou kompatibilitu
+  se stávajícím obsahem `chat_history.txt` — moc velký zásah na review-fix
+  uvnitř už schválené malé iterace.
+- Neřešit teď, nechat jako odloženou položku (původní návrh z review) —
+  zamítnuto po rozhodnutí uživatele opravit nález před mergem: jde o tichou
+  ztrátu/zkomolení kontextu, stejná třída incidentu jako hlavní problém týhle
+  iterace, ne jen kosmetika.
+
+**Date:** 2026-09-21
+
+## `appendHistory` si guarduje vlastní I/O interně, ne přes try/catch u volajícího (iterace "zápis unsolicited textu do historie", 3. kolo review)
+
+**Decision:** `appendHistory` (`bridge-ts/src/history.ts`) obalí `appendFileSync`
+vlastním try/catch a chybu jen zaloguje, stejnou konvencí jako `logTurn`
+(`turnLog.ts`) — místo aby guard proti selhání zápisu (ENOSPC/EACCES) musel
+duplikovat každý volající zvlášť.
+
+**Why:** Druhé kolo review přidalo try/catch jen kolem nového volání v
+`claudeProcess.ts` (unsolicited větev), ale ponechalo starší volání v
+`index.ts` (běžná Telegram odpověď) neošetřené — při selhání zápisu by
+výjimka utekla z `processQueue()` jako unhandled rejection a uživatel by
+nedostal `✅ Výsledek`, i když úkol doběhl. Guard uvnitř `appendHistory`
+pokryje oba volající najednou a nejde znovu zapomenout u budoucího třetího.
+
+Zároveň v tomhle kole opraveno: `obj.type === "result"` větev v
+`handleUnsolicitedLine` při ne-stringovém `obj.result` (pozorováno v praxi)
+dřív zahodila text bez zápisu do historie, i když poslední streamovaný
+`assistant` blok (`this.unsolicitedText`) byl k dispozici jako fallback —
+reprodukovalo by to přesně ten incident, co iterace řeší. Historie teď padá
+na `this.unsolicitedText`, broadcast (kde by šlo o duplicitní odeslání už
+live odeslaného textu) zůstává beze změny na původním `obj.result`.
+
+**Alternatives:**
+- Nechat try/catch jen u nového volání, `index.ts:143` doplnit zvlášť —
+  zamítnuto, řeší jen symptom, ne konvenci; příští volající by na to mohl
+  zapomenout znovu.
+
+**Date:** 2026-09-30
