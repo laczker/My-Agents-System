@@ -12,7 +12,7 @@ FROM node:20-slim
 # Bez pinu by build v jiný den mohl stáhnout novější CLI s jinou sadou/chováním
 # `--stream-json` flagů, než na jaké je claudeProcess.ts psaný — verzi je potřeba
 # ručně bump-nout spolu s ověřením při aktualizaci hostitelského CLI.
-RUN npm install -g @anthropic-ai/claude-code@2.1.233
+RUN npm install -g @anthropic-ai/claude-code@2.1.280
 
 WORKDIR /home/agent/agent-system/bridge-ts
 COPY bridge-ts/package.json bridge-ts/package-lock.json ./
