@@ -80,6 +80,34 @@ výjimkou pro skutečně živé cross-session zprávy — potřeba rozmyslet, ja
 rozlišit "background dokončení mého vlastního subagenta" od "cizí bot mi
 něco poslal", než se z toho udělá spec.
 
+### Sebe-restart devbota může zabít vlastní odpověď uprostřed tahu (zjištěno 30.9., incident při restartu po mergi úklidu komentářů)
+
+Restart po schváleném mergi (7 profilů + dashboard + devbot) ukázal, že
+proces, který zrovna generuje odpověď uživateli, běží jako potomek `claude -p`
+podprocesu spuštěného právě tím `bridge-ts` řetězcem, co se má restartovat
+(`ps` strom: `npm exec tsx src/index.ts devbot` → ... → `claude -p --resume
+<session_id>` → tahle bash session). Kill vlastního řetězce uprostřed tahu
+useknu odpověď dřív, než `index.ts` dostane finální `result` a zavolá
+`send()` — uživatel nedostane nic, žádnou chybu, jen ticho.
+
+Řešení použité 30.9.: naplánovat kill+restart jako detached background
+skript (`nohup bash -c 'sleep 20; kill ...; nohup npx tsx ... &' & disown`)
+se zpožděním, aby stihla doletět odpověď před tím, než se proces zabije.
+Zabralo to jen částečně — restart se sice provedl, ale odpověď na schválení
+mergu se přesto neposlala (uživatel se pak sám zeptal "co se stalo?").
+Nevyřešeno proč přesně (možné vysvětlení: 20s nestačilo, nebo `send()` sám
+o sobě něco blokovalo). Navíc stejný restartovací pokus přispěl k `409 Conflict` závodu s cron
+watchdogem popsanému v `DECISIONS.md` (30.9., "Restart přes `watchdog.sh`
+konvenci musí nejdřív dočasně vypnout cron watchdog") — skript nevypínal
+cron watchdog.
+
+Souvisí s položkou výš (`handleUnsolicitedLine`) — obě jsou instance stejného
+nadřazeného tématu ("automatické ozvání se/nezmizení odpovědi"), co uživatel
+opakovaně vznáší. Než se bude řešit jako iterace, potřeba spec: (a) jak
+bezpečně zjistit, že finální odpověď už byla `send()`-nuta, než se proces
+smí zabít (např. čekat na zápis do `chat_history.txt` daného tahu, ne pevné
+zpoždění), (b) vždy nejdřív vypnout cron watchdog (viz `DECISIONS.md`).
+
 ## Odloženo
 
 ### `chat_history.txt` roste bez rotace, teď i rychleji (zjištěno 21.9., review iterace "zápis unsolicited textu do historie")
@@ -109,18 +137,29 @@ s neviditelnými znaky), `unescapeDelimiter` ho při čtení smaže, i když ho
 review nález "altitude" a zamítnutá alternativa v `DECISIONS.md`), ne další
 vrstva escapování. Sledovat, jestli se v praxi projeví.
 
-### Úklid komentářů v kódu — bez češtiny, bez AI komentářového balastu (zadáno 30.9.)
+### Úklid komentářů v kódu — bez češtiny, bez AI komentářového balastu (zadáno 30.9., hotovo 30.9.)
+
+Implementováno ve worktree (`worktree-cleanup-comments`), `/code-review` proběhl
+(1 nález — quotovaný český název sekce v `TASKS.md` přeložený do angličtiny ve
+`watchdog.sh` komentáři by rozbil textový odkaz, protože `TASKS.md` zůstává
+česky podle specu — opraveno). Čeká na schválení checkpointu, pak merge.
+
+---
 
 Uživatel chce před víkendovým review (chystá se otevřít kódovou základnu ve
 vlastním IDE a rozjet nad ní vlastní instanci Claude Code, aby si systém
 prošel) pročistit komentáře napříč celým systémem — žádné komentáře v
 češtině, žádný typický AI-generovaný komentářový balast (komentáře, co jen
 opakují, co už říká název funkce/proměnné). Dopadá na sdílený produkční kód
-napříč všemi boty (min. `bridge-ts`), ne jen na devbot — potřeba nejdřív
-rozmyslet rozsah (jen `bridge-ts/src`? i per-bot skripty/`CLAUDE.md`?) a
-napsat samostatný spec ke schválení, ne rovnou kódovat — stejná nízká
-autonomie jako ostatní iterace (sdílený provoz). Zařadit do fronty, pořadí
-zpracování vůči ostatním položkám fronty uživateli nezáleží (30.9.).
+napříč všemi boty (min. `bridge-ts`), ne jen na devbot.
+
+**Spec schválen (30.9.):** rozsah = zdrojové soubory (`bridge-ts/src/*.ts`,
+`personal/dashboard/src/*.ts`, `*.sh` skripty napříč boty) — bez češtiny, bez
+AI komentářového balastu. **Ne** `CLAUDE.md`/`TASKS.md`/`DECISIONS.md`/
+`META_BOT.md`/`ARCHITEKTURA.md` (dokumentace pro uživatele, záměrně česky).
+Implementace jde ve worktree přes vývojáře (subagent), pak `/code-review`,
+pak konsolidovaný checkpoint ke schválení — stejný cyklus jako ostatní
+iterace (sdílený provoz).
 
 ### Dockerfile.daily verze `claude` CLI neodpovídá hostiteli (zjištěno 30.9.)
 

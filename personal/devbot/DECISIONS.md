@@ -174,3 +174,41 @@ live odeslaného textu) zůstává beze změny na původním `obj.result`.
   zapomenout znovu.
 
 **Date:** 2026-09-30
+
+## Restart přes `watchdog.sh` konvenci musí nejdřív dočasně vypnout cron watchdog (incident 30.9.)
+
+**Decision:** Jakýkoliv ruční restart `bridge-ts` procesu (kill + nový `nohup`)
+musí napřed dočasně vyřadit `watchdog.sh` z crontabu (stejně jako to už dělá
+`restart_bridge_ts.sh` — `crontab -l | grep -v watchdog.sh | crontab -`,
+restartovat, pak crontab vrátit), a to i pro skript spuštěný na pozadí se
+zpožděním (viz níž).
+
+**Why:** Po mergi úklidu komentářů (30.9.) jsem restartoval 7 profilů (bez
+devbota) ručním kill+nohup bez vypnutí cronu. `watchdog.sh` běží v cronu
+každou minutu a kontroluje jen "běží/neběží" — v okně mezi mým kill a mým
+nohup startem cron u několika profilů taky uviděl "neběží" a nastartoval
+vlastní kopii, takže krátce běžely dva procesy se stejným Telegram tokenem
+najednou → Telegram vrací `409 Conflict` oběma pollerům. Trvalo to u
+jednotlivých profilů řádově desítky sekund až ~2 minuty (viz `409 Conflict`
+řádky v `bridge_ts*.log` z 30.9. cca 12:00–12:02), než jeden z dvojice
+prohrál a spadl a zůstal běžet jeden. Nikdo ale finálně nezůstal nefunkční —
+heartbeaty se srovnaly, žádný zásah navíc nebyl potřeba.
+
+U devbota to bylo horší: restart vlastního profilu nejde spustit synchronně
+uvnitř běžícího tahu (viz `TASKS.md` — sebe-restart zabije proces, který
+zrovna generuje odpověď uživateli), takže jsem ho naplánoval jako detached
+background skript se `sleep 20` před kill+restart. I ten ale běžel bez
+vypnutí cronu, takže se do stejného 409-konfliktu zamotal i devbot — a
+protože vlastní restart zabil proces uprostřed generování odpovědi na
+schválení mergu, uživatel tu odpověď vůbec nedostal (ticho, pak se sám zeptal
+"co se stalo?"). Přesně to je scénář, co řešíme v `TASKS.md` u tématu
+"automatické ozvání se" — teď je jasné, že souvisí i se sebe-restartem, ne
+jen s `handleUnsolicitedLine`.
+
+**Alternatives:**
+- Nechat cron běžet a spoléhat na to, že se to samo srovná (jak se nakonec
+  stalo u 7 profilů) — zamítnuto pro devbota, protože tam vedlejší efekt
+  (ztracená odpověď uživateli) není přijatelný, i když se produkční stav sám
+  opraví.
+
+**Date:** 2026-09-30
