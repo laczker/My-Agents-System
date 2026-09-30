@@ -4,18 +4,19 @@ import { QUEUE_FILE } from "./config.js";
 export interface Job {
   userText: string;
   downloadedFileInfo: string;
-  /** Telegram chat, odkud zpráva přišla — výsledek se posílá zpátky sem, ne
-   * broadcastem na všechny povolené chaty (relevantní jen pro boty s víc než
-   * jedním chat ID, viz `TELEGRAM_CHAT_IDS_EXTRA`). Staré položky ve frontě
-   * (před touhle změnou) tenhle klíč nemají — dopočítá se na `TELEGRAM_CHAT_ID`. */
+  /** The Telegram chat the message came from — the result is sent back here, not
+   * broadcast to all allowed chats (relevant only for bots with more than one chat
+   * ID, see `TELEGRAM_CHAT_IDS_EXTRA`). Old queue items (from before this change)
+   * lack this key — it falls back to `TELEGRAM_CHAT_ID`. */
   chatId?: string;
 }
 
 interface QueueState {
   jobs: Job[];
-  /** epoch ms, dokdy se čeká na obnovení Claude usage limitu (null = nečeká se).
-   * Přežívá restart bridge procesu, ať se po pádu/redeployi během čekání na
-   * reset kvóty fronta nezapomene a nezačne se zbytečně hned znovu bušit do limitu. */
+  /** epoch ms until which we're waiting for the Claude usage limit to reset (null =
+   * not waiting). Survives a bridge process restart, so that during a crash/redeploy
+   * while waiting for the quota reset, the queue isn't forgotten and doesn't
+   * needlessly start hammering the limit again right away. */
   rateLimitResumeAtMs: number | null;
 }
 

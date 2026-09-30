@@ -1,6 +1,6 @@
-// Čte `job_queue_ts.json`, který si každý bot sám plní (bridge-ts/src/queue.ts).
-// Neprázdná fronta = bot právě zpracovává (nebo čeká na zpracování) úkol — žádná
-// nová instrumentace navíc, jen čtení existujícího stavu fronty.
+// Reads `job_queue_ts.json`, which each bot fills in on its own (bridge-ts/src/queue.ts).
+// A non-empty queue = the bot is currently processing (or waiting to process) a job —
+// no extra instrumentation added, just reading the existing queue state.
 import { readFileSync } from "node:fs";
 import type { BotDef } from "./config.js";
 

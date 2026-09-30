@@ -1,25 +1,26 @@
 #!/bin/bash
-# Denní třídění inboxu — samostatný skript, nezávislý na sdíleném bridge-ts/
-# CronCreate (viz META_BOT.md §3.5, DECISIONS.md 27.8.: CronCreate žije jen
-# v paměti běžícího procesu a zmizí beze stopy při restartu/rate limitu).
+# Daily inbox triage — standalone script, independent of the shared bridge-ts/
+# CronCreate (see META_BOT.md §3.5, DECISIONS.md 27.8.: CronCreate lives only
+# in the running process's memory and vanishes without a trace on
+# restart/rate limit).
 #
-# Historický balast v inboxu je dávno vyčištěný (viz CLEANUP_PROGRESS.md,
-# status "done"). Tenhle skript proto běží jen JEDNOU DENNĚ (viz crontab) a
-# roztřídí, co za den nateklo nového jako `is:unread in:inbox` — žádné
-# opakované probouzení co 20 minut přes noc, to dřív jen zbytečně spouštělo
-# desítky prázdných "ověřovacích" dávek (0 nové pošty) a plýtvalo to voláními
-# (viz uživatelova zpětná vazba 11.9.: "proč tam celou noc něco běželo... to
-# teď nechci... chci jen nějak přerozdělovat, ale to stačí jednou denně").
+# Historical backlog in the inbox was cleaned out long ago (see
+# CLEANUP_PROGRESS.md, status "done"). This script therefore runs only ONCE
+# A DAY (see crontab) and triages whatever came in that day as `is:unread
+# in:inbox` — no more waking up every 20 minutes overnight, which used to
+# fire off dozens of empty "check-in" batches (0 new mail) and waste calls
+# (see user feedback 11.9.: "why was something running all night... I don't
+# want that now... I just want it sorted, but once a day is enough").
 #
-# Třídění je od 15.9. pětikategoriové (viz DECISIONS.md), ne binární
-# smaž/archivuj — mazání je vzácná akce jen pro odesílatele explicitně
-# uvedené v spam_senders.txt, nejistý marketing (LinkedIn apod.) se jen
-# štítkuje a archivuje, aby ho uživatel mohl sám prolistovat.
+# Triage has been five-category since 15.9. (see DECISIONS.md), not a binary
+# delete/archive — deletion is a rare action reserved for senders explicitly
+# listed in spam_senders.txt; uncertain marketing (LinkedIn etc.) only gets
+# labeled and archived so the user can browse it themselves.
 #
-# Telegram zprávy: přesně jedna po doběhnutí dávky se souhrnem, plus okamžitá
-# eskalace, pokud dávka najde něco, co potřebuje rozhodnutí hned. Při selhání
-# jedna varovná zpráva, žádné automatické opakování do rána (další pokus je
-# až zítřejší běh).
+# Telegram messages: exactly one after the batch finishes, with a summary,
+# plus an immediate escalation if the batch finds something that needs a
+# decision right away. On failure, one warning message, no automatic retry
+# until morning (the next attempt is tomorrow's run).
 set -uo pipefail
 
 DIR="/home/agent/agent-system/personal/mailista"
@@ -146,10 +147,11 @@ if [ -n "$ESCALATE_LINES" ]; then
   send_telegram "⚠️ $(echo "$ESCALATE_LINES" | sed 's/^ESCALATE: //')"
 fi
 
-# BATCH_ERROR = dávka se sama vzdala kvůli chybě nástrojů (např. Gmail MCP
-# nedostupné/OAuth) — status skriptu claude -p je přitom 0, takže tohle
-# NENÍ pokryté kontrolou výše. Rozlišit od "opravdu 0 vláken", jinak se
-# tohle tiše zaloguje jako OK s nulami (viz #290, 16.9.).
+# BATCH_ERROR = the batch gave up on itself due to a tool error (e.g. Gmail
+# MCP unavailable/OAuth) — the claude -p script's exit status is 0 in that
+# case, so this is NOT covered by the check above. Must be distinguished
+# from "genuinely 0 threads", otherwise it silently logs as OK with zeros
+# (see #290, 16.9.).
 BATCH_ERROR_LINE=$(echo "$OUTPUT" | grep '^BATCH_ERROR:' | tail -1)
 if [ -n "$BATCH_ERROR_LINE" ]; then
   REASON=$(echo "$BATCH_ERROR_LINE" | sed 's/^BATCH_ERROR: //')

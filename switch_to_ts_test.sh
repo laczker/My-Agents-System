@@ -1,7 +1,8 @@
 #!/bin/bash
-# Jednorázový test-switch skript: čeká, až doručím aktuální odpověď přes bridge.py
-# (velká rezerva, ne odhad na míru — viz DECISIONS.md, past z 17.8.), pak bridge.py
-# zastaví a nahradí ho TS verzí pro živý test.
+# One-off test-switch script: waits until the current reply is delivered via
+# bridge.py (a large safety margin, not a tight estimate — see DECISIONS.md,
+# the 17.8. incident), then stops bridge.py and replaces it with the TS
+# version for a live test.
 sleep 60
 
 BRIDGE_PID=$(pgrep -f "python3 bridge.py")

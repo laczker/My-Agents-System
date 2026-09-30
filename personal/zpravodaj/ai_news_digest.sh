@@ -1,19 +1,20 @@
 #!/bin/bash
-# AI novinky — event-driven digest, nezávislý na daily_digest.sh.
-# Spouští se hodinovým cronem a sám se ukončí, pokud zrovna není pondělí 2:00
-# (Europe/Prague) — stejný DST-safe trik jako u daily_digest.sh (hodinový cron,
-# skript sám pozná správný čas). Frekvence: jednou týdně (potvrzeno uživatelem
-# 18.8., viz DECISIONS.md), ne vícekrát denně.
-# I tak: pošle zprávu JEN pokud model najde skutečně relevantní novinku, kterou
-# ještě neposlal (viz ai_news_seen.txt) — event-driven v tom smyslu, že prázdný
-# týden nic neodešle.
+# AI news — event-driven digest, independent of daily_digest.sh.
+# Runs on an hourly cron and exits itself unless it's currently Monday 2:00
+# (Europe/Prague) — same DST-safe trick as daily_digest.sh (hourly cron, the
+# script figures out the right time itself). Frequency: once a week
+# (confirmed by the user 18.8., see DECISIONS.md), not multiple times a day.
+# Still: it only sends a message if the model finds a genuinely relevant
+# item it hasn't sent before (see ai_news_seen.txt) — event-driven in the
+# sense that an empty week sends nothing.
 #
-# Výpadek (rate limit apod.): stejný marker mechanismus jako daily_digest.sh
-# (viz DECISIONS.md, 24.8.) — OUTAGE_MARKER se založí při první chybě, varování
-# jde JEN JEDNOU za výpadek, dokud marker existuje a není starší než
-# OUTAGE_CAP_SECONDS se zkouší i mimo pondělní okno (bez dalších Telegram zpráv
-# na neúspěch, jen log), po obnovení jedna potvrzující zpráva, po překročení
-# stropu se to jednou nahlásí a čeká se na příští pondělní okno.
+# Outage (rate limit etc.): same marker mechanism as daily_digest.sh (see
+# DECISIONS.md, 24.8.) — OUTAGE_MARKER is created on the first failure, the
+# warning is sent only ONCE per outage. While the marker exists and is not
+# older than OUTAGE_CAP_SECONDS, the script also retries outside the Monday
+# window (no further Telegram messages on failure, just logging); once it
+# recovers, one confirmation message is sent; once the cap is exceeded, it
+# reports once and waits for the next Monday window.
 set -uo pipefail
 
 DIR="/home/agent/agent-system/personal/zpravodaj"
@@ -152,7 +153,7 @@ TEASER=$(echo "$OUTPUT" | awk '/^TEASER:/{sub(/^TEASER: */,""); print; exit}')
 BODY=$(echo "$OUTPUT" | awk 'BEGIN{seen=0;f=0} /^TEASER:/{seen=1;next} seen&&f==0&&/^$/{f=1;next} f{print}')
 
 if [ -z "$BODY" ]; then
-  # model neposlal očekávaný formát - pošli rovnou celý výstup, ať se neztratí
+  # model didn't send the expected format - forward the whole output as-is so nothing gets lost
   BODY="$OUTPUT"
 fi
 [ -z "$TEASER" ] && TEASER="Nové AI novinky jsou k dispozici."

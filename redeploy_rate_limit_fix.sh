@@ -1,11 +1,12 @@
 #!/bin/bash
-# Nasazuje opravu "usage limit hláška = ztracený úkol" (viz DECISIONS.md,
-# personal/assistant, 17.8.) + dřív odsouhlasený globální unhandledRejection/
-# uncaughtException handler. Restartuje všechny tři instance bridge-ts
-# (assistant, zpravodaj, mailista — sdílí stejný zdroják), sekvenčně s
-# prodlevou, ať se nekoliduje na getUpdates hned po sobě. Stejný bezpečný
-# postup jako `redeploy_eof_fix.sh` (cron watchdog dočasně vypnutý, 60s
-# rezerva ať doběhne rozpracovaná odpověď, pak restart, pak cron zpět).
+# Deploys the fix for "usage-limit message = lost task" (see DECISIONS.md,
+# personal/assistant, 17.8.) + the previously agreed-on global
+# unhandledRejection/uncaughtException handler. Restarts all three bridge-ts
+# instances (assistant, zpravodaj, mailista — share the same source),
+# sequentially with a delay, to avoid colliding on getUpdates right after
+# each other. Same safe procedure as `redeploy_eof_fix.sh` (cron watchdog
+# temporarily disabled, 60s buffer to let an in-flight reply finish, then
+# restart, then cron back on).
 LOG=/home/agent/agent-system/bridge_ts_switch.log
 
 crontab -l > /home/agent/agent-system/crontab_backup.txt

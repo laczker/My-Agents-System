@@ -1,9 +1,9 @@
 import { USER_TIMEZONE } from "./config.js";
 
-// Když `claude` CLI narazí na 5hodinovou/týdenní kvótu, vrátí místo skutečné
-// odpovědi text ve tvaru "You've hit your session limit · resets 3:50pm (UTC)"
-// (viz DECISIONS.md, ověřeno ručně). Tenhle regex ho pozná bez ohledu na to,
-// jestli jde o "session limit", "weekly limit" apod.
+// When the `claude` CLI hits the 5-hour/weekly quota, it returns text of the form
+// "You've hit your session limit · resets 3:50pm (UTC)" instead of a real reply
+// (see DECISIONS.md, verified manually). This regex recognizes it regardless of
+// whether it says "session limit", "weekly limit", etc.
 const HIT_LIMIT_PATTERN = /you'?ve hit your [a-z ]*limit/i;
 const RESETS_TIME_PATTERN = /resets\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*\(UTC\)/i;
 
@@ -11,8 +11,8 @@ export function looksLikeRateLimitText(text: string): boolean {
   return HIT_LIMIT_PATTERN.test(text);
 }
 
-/** Rozparsuje "resets 3:50pm (UTC)" na epoch ms. Čas v hlášce je vždy nejbližší
- * budoucí výskyt té hodiny v UTC — pokud vyjde v minulosti, je to zítra. */
+/** Parses "resets 3:50pm (UTC)" into epoch ms. The time in the message is always the
+ * nearest future occurrence of that hour in UTC — if it comes out in the past, it's tomorrow. */
 export function parseResetsAtFromText(text: string, now: Date = new Date()): number | null {
   const m = RESETS_TIME_PATTERN.exec(text);
   if (!m) return null;
@@ -29,9 +29,9 @@ export function parseResetsAtFromText(text: string, now: Date = new Date()): num
   return candidate.getTime();
 }
 
-/** `resetsAt` z `rate_limit_event` je zod `int()` bez jednotky — API ho posílá
- * v sekundách (unix epoch), ale pro jistotu proti budoucí změně rozliš podle
- * řádu velikosti (ms epoch je ~1000x větší). */
+/** `resetsAt` from `rate_limit_event` is a unitless zod `int()` — the API sends it
+ * in seconds (unix epoch), but as a safeguard against a future change, distinguish by
+ * order of magnitude (ms epoch is ~1000x bigger). */
 export function normalizeResetsAt(resetsAt: number): number {
   return resetsAt < 10_000_000_000 ? resetsAt * 1000 : resetsAt;
 }

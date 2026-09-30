@@ -20,8 +20,8 @@ function readHeartbeat(dir: string): number | null {
   }
 }
 
-// Stejný default jako CLAUDE_MODEL v bridge-ts/src/config.ts — dokud .env.<profil>
-// hodnotu nepřepíše, bot běží na "sonnet" (CLI default).
+// Same default as CLAUDE_MODEL in bridge-ts/src/config.ts — until .env.<profile>
+// overrides it, the bot runs on "sonnet" (CLI default).
 const DEFAULT_MODEL = "sonnet";
 
 function readModel(envFile: string): string {

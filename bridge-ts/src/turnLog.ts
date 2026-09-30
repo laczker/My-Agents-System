@@ -1,23 +1,23 @@
 import { appendFileSync } from "node:fs";
 import { TURN_LOG_FILE } from "./config.js";
 
-// Cena (`total_cost_usd`) se záměrně neloguje — uživatel má Claude Pro paušál,
-// útrata za tah ho nezajímá (viz DECISIONS.md, 18.8.).
+// The cost (`total_cost_usd`) is deliberately not logged — the user has a flat Claude
+// Pro subscription, spend per turn doesn't matter to them (see DECISIONS.md, 18.8.).
 export type TurnLogEntry =
   | {
       type: "turn";
       ts: string;
       contextTokens: number;
-      // `input + cache_creation` bez `cache_read` — proxy pro "čerstvé" tokeny
-      // spotřebované tímhle tahem (cache_read jsou recyklované/levné). Slouží
-      // k odhadu, kolik tokenů se "propálilo" v rámci jednoho rate-limit okna
-      // (viz `resetsAtMs`/`rateLimited` níž a dashboard `usage.ts`).
+      // `input + cache_creation` without `cache_read` — a proxy for "fresh" tokens
+      // consumed by this turn (cache_read is recycled/cheap). Used to estimate how
+      // many tokens got "burned" within one rate-limit window (see
+      // `resetsAtMs`/`rateLimited` below and the `usage.ts` dashboard).
       newTokens: number;
       durationMs: number | null;
       durationApiMs: number | null;
       isError: boolean;
-      // Tenhle tah narazil na Claude usage limit (5h/týdenní kvóta) místo
-      // skutečné odpovědi — viz rateLimit.ts.
+      // This turn hit the Claude usage limit (5h/weekly quota) instead of a real
+      // reply — see rateLimit.ts.
       rateLimited: boolean;
       resetsAtMs: number | null;
     }

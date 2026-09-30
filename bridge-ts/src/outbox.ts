@@ -2,27 +2,28 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { GrammyError } from "grammy";
 import { OUTBOX_FILE, OUTBOX_RETRY_INTERVAL_MS, TELEGRAM_CHAT_ID } from "./config.js";
 
-// 400 = chyba vázaná na tuhle konkrétní zprávu/chat (např. "chat not found", příliš
-// dlouhý text, špatný Markdown) — retry by dopadl stejně, takže zahodit.
-// 403 = bot je v chatu zablokovaný/vyhozený — trvalé pro celý chat, ne jen tuhle
-// zprávu, ale pořád nemá smysl frontu blokovat kvůli němu.
+// 400 = error tied to this specific message/chat (e.g. "chat not found", text too
+// long, bad Markdown) — a retry would turn out the same, so drop it.
+// 403 = the bot is blocked/kicked from the chat — permanent for the whole chat, not
+// just this message, but still no point blocking the queue over it.
 const PERMANENT_ERROR_CODES = new Set([400, 403]);
 
 interface OutboxItem {
   id: string;
   text: string;
   createdAt: number;
-  /** Kam zprávu poslat. Staré položky z outboxu (před touhle změnou) klíč nemají —
-   * dopočítá se na `TELEGRAM_CHAT_ID`, stejné chování jako dřív. */
+  /** Where to send the message. Old outbox items (from before this change) lack this
+   * key — it falls back to `TELEGRAM_CHAT_ID`, same behavior as before. */
   chatId?: string;
 }
 
-// Trvalá fronta odchozích zpráv (Ludwigův vzor). Zpráva se na disk zapíše DŘÍV, než
-// se vůbec zkusí odeslat — takže i když bridge proces spadne/restartuje se uprostřed
-// odesílání (nebo hned po dopočítání odpovědi, před odesláním), zpráva se po
-// znovunastartování při flushOutbox() doručí, místo aby zmizela. Tohle nahrazuje
-// Ludwigovo "grab poslední text z transkriptu" spolehlivěji — nezávisí na parsování
-// transkriptu, jen na tom, že zápis na disk proběhl dřív než síťové volání.
+// A persistent queue of outgoing messages (Ludwig's pattern). A message is written to
+// disk BEFORE it's even attempted to be sent — so even if the bridge process
+// crashes/restarts mid-send (or right after computing the reply, before sending), the
+// message gets delivered on restart via flushOutbox() instead of disappearing. This
+// replaces Ludwig's "grab the last text from the transcript" more reliably — it
+// doesn't depend on parsing the transcript, only on the disk write happening before
+// the network call.
 export class Outbox {
   private items: OutboxItem[] = [];
   private sendFn: (text: string, chatId: string) => Promise<void>;

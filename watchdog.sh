@@ -1,15 +1,18 @@
 #!/bin/bash
-# Restartuje bridge-ts procesy, pokud neběží. Náhrada za systemd Restart=always —
-# na hostu není dostupný root ani docker socket (viz DECISIONS.md), takže
-# supervize jede přes cron (crontab -e, spouští se každou minutu).
-# Jeden engine obsluhuje víc nezávislých botů (profil = argument `tsx src/index.ts`,
-# viz bridge-ts/src/config.ts) — každý se hlídá a startuje zvlášť, ať pád/restart
-# jednoho neovlivní druhý. `$` v pgrep patternu pro assistant vylučuje shodu s
-# "... index.ts zpravodaj" (bez profilu vs. s profilem).
+# Restarts bridge-ts processes if they're not running. Replacement for
+# systemd Restart=always — root and the docker socket aren't available on
+# the host (see DECISIONS.md), so supervision runs via cron (crontab -e,
+# runs every minute).
+# One engine serves multiple independent bots (profile = argument to
+# `tsx src/index.ts`, see bridge-ts/src/config.ts) — each is watched and
+# started separately, so a crash/restart of one doesn't affect another. The
+# `$` in the pgrep pattern for assistant excludes a match with
+# "... index.ts zpravodaj" (no profile vs. with a profile).
 #
-# Každý restart se navíc loguje do SQLite (personal/dashboard/dashboard.sqlite) přes
-# `record_restart`, ať to `personal/dashboard` umí zobrazit v historii — bash sám
-# SQLite psát neumí (na hostu není `sqlite3` CLI), proto volání malého TS skriptu.
+# Every restart is also logged to SQLite (personal/dashboard/dashboard.sqlite)
+# via `record_restart`, so `personal/dashboard` can show it in history — bash
+# itself can't write SQLite (no `sqlite3` CLI on the host), hence calling the
+# small TS script.
 record_restart() {
     (cd /home/agent/agent-system/personal/dashboard && npx tsx src/recordRestart.ts "$1" "$2") >> /home/agent/agent-system/watchdog.log 2>&1
 }
@@ -68,9 +71,9 @@ if ! pgrep -f "tsx.*/personal/zpravodaj/webapp/server/src/index.ts$" > /dev/null
     (cd /home/agent/agent-system/personal/zpravodaj/webapp/server && nohup npx tsx /home/agent/agent-system/personal/zpravodaj/webapp/server/src/index.ts >> /home/agent/agent-system/zpravodaj_webapp.log 2>&1 &)
 fi
 
-# Denní Docker kontejner (docker-compose.daily.yml) — Docker pilot iterace 4.
-# Záměrně zakomentováno, důvod a aktivační postup viz META_BOT.md §4a a
-# personal/devbot/TASKS.md ("Aktivace watchdog restartu kontejneru v cronu").
+# Daily Docker container (docker-compose.daily.yml) — Docker pilot iteration 4.
+# Deliberately commented out; reason and activation steps in META_BOT.md §4a
+# and personal/devbot/TASKS.md ("Aktivace watchdog restartu kontejneru v cronu").
 #
 # compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
 # if [ $? -ne 0 ]; then

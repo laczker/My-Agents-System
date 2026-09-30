@@ -1,17 +1,19 @@
 #!/bin/bash
-# Denní ranní zpravodaj — samostatný skript, nezávislý na sdíleném bridge-ts.
-# Spouští se hodinovým cronem (viz níž) a sám se ukončí, pokud zrovna není 8:00
-# pražského času — cron běží v UTC, tohle řeší přechod na letní/zimní čas bez
-# nutnosti dvakrát ročně přepisovat crontab.
+# Daily morning digest — standalone script, independent of the shared bridge-ts.
+# Runs on an hourly cron (see below) and exits itself unless it's currently
+# 8:00 Prague time — cron runs in UTC, this handles the DST transition
+# without having to rewrite the crontab twice a year.
 #
-# Výpadek (rate limit apod.): hlídá se markerem OUTAGE_MARKER (viz DECISIONS.md,
-# 24.8.). Když run selže, marker se založí a varování pošle JEN JEDNOU za celý
-# výpadek (ne při každém dalším pokusu). Dokud marker existuje a není starší než
-# OUTAGE_CAP_SECONDS, skript se pokusí i mimo 8:00 okno (bere hodinový cron jako
-# retry), ale bez dalších Telegram zpráv na neúspěch — jen log. Až run konečně
-# projde, marker se smaže a pošle se JEDNA zpráva o obnovení. Pokud výpadek trvá
-# déle než strop, automatické opakování se vzdá (taky jen jednou nahlásí) a čeká
-# se na příští normální 8:00 okno.
+# Outage (rate limit etc.): tracked via the OUTAGE_MARKER file (see
+# DECISIONS.md, 24.8.). When a run fails, the marker is created and the
+# warning is sent only ONCE for the whole outage (not on every retry). While
+# the marker exists and is not older than OUTAGE_CAP_SECONDS, the script
+# also retries outside the 8:00 window (treating the hourly cron as a
+# retry), but without further Telegram messages on failure — just logging.
+# Once a run finally succeeds, the marker is removed and ONE recovery
+# message is sent. If the outage lasts longer than the cap, automatic
+# retrying gives up (also reporting just once) and waits for the next normal
+# 8:00 window.
 set -uo pipefail
 
 DIR="/home/agent/agent-system/personal/zpravodaj"
