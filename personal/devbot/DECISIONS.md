@@ -145,3 +145,32 @@ takže se text v Telegramu ani při zpětném čtení historie nezmění.
   iterace, ne jen kosmetika.
 
 **Date:** 2026-09-21
+
+## `appendHistory` si guarduje vlastní I/O interně, ne přes try/catch u volajícího (iterace "zápis unsolicited textu do historie", 3. kolo review)
+
+**Decision:** `appendHistory` (`bridge-ts/src/history.ts`) obalí `appendFileSync`
+vlastním try/catch a chybu jen zaloguje, stejnou konvencí jako `logTurn`
+(`turnLog.ts`) — místo aby guard proti selhání zápisu (ENOSPC/EACCES) musel
+duplikovat každý volající zvlášť.
+
+**Why:** Druhé kolo review přidalo try/catch jen kolem nového volání v
+`claudeProcess.ts` (unsolicited větev), ale ponechalo starší volání v
+`index.ts` (běžná Telegram odpověď) neošetřené — při selhání zápisu by
+výjimka utekla z `processQueue()` jako unhandled rejection a uživatel by
+nedostal `✅ Výsledek`, i když úkol doběhl. Guard uvnitř `appendHistory`
+pokryje oba volající najednou a nejde znovu zapomenout u budoucího třetího.
+
+Zároveň v tomhle kole opraveno: `obj.type === "result"` větev v
+`handleUnsolicitedLine` při ne-stringovém `obj.result` (pozorováno v praxi)
+dřív zahodila text bez zápisu do historie, i když poslední streamovaný
+`assistant` blok (`this.unsolicitedText`) byl k dispozici jako fallback —
+reprodukovalo by to přesně ten incident, co iterace řeší. Historie teď padá
+na `this.unsolicitedText`, broadcast (kde by šlo o duplicitní odeslání už
+live odeslaného textu) zůstává beze změny na původním `obj.result`.
+
+**Alternatives:**
+- Nechat try/catch jen u nového volání, `index.ts:143` doplnit zvlášť —
+  zamítnuto, řeší jen symptom, ne konvenci; příští volající by na to mohl
+  zapomenout znovu.
+
+**Date:** 2026-09-30

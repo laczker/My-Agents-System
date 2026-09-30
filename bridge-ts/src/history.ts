@@ -28,7 +28,16 @@ function unescapeDelimiter(text: string): string {
   return text.replace(/---​\n/g, "---\n");
 }
 
+// Chyba zápisu (ENOSPC/EACCES) se řeší tady, ne u volajícího — stejná
+// konvence jako `logTurn` (`turnLog.ts`). appendHistory má dva volající
+// (běžná Telegram odpověď v `index.ts`, unsolicited tah v `claudeProcess.ts`)
+// a bez interního try/catch by musel guard duplikovat každý z nich zvlášť —
+// jeden z nich to skutečně zapomněl (index.ts, dokud sem guard nepřibyl).
 export function appendHistory(userMsg: string, botMsg: string): void {
   const body = `Uživatel: ${userMsg}\nClaude: ${botMsg}\n`;
-  appendFileSync(HISTORY_FILE, escapeDelimiter(body) + "---\n");
+  try {
+    appendFileSync(HISTORY_FILE, escapeDelimiter(body) + "---\n");
+  } catch (err) {
+    console.error("Zápis do chat_history.txt selhal:", err);
+  }
 }

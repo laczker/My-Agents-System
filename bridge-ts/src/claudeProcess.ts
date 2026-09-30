@@ -179,22 +179,30 @@ export class ClaudeProcess {
       }
     }
     if (obj.type === "result") {
-      const text = typeof obj.result === "string" ? obj.result : "";
-      const isSilent = text.trimStart().startsWith(SILENT_MARKER);
-      const shouldNotify = Boolean(text) && text !== this.unsolicitedText && !isSilent;
+      // `obj.result` bývá i ne-stringový (pozorováno v praxi) — pro broadcast se
+      // pak nic neposílá (dřívější `assistant` blok už live odešel), ale pro
+      // zápis do historie se použije poslední streamovaný `assistant` text
+      // (`this.unsolicitedText`) jako fallback, stejně jako `send()` cesta níž
+      // padá na `lastAssistantText` — jinak by se tenhle tah v historii ztratil
+      // úplně, přesně ten incident, co tahle iterace řeší.
+      const rawText = typeof obj.result === "string" ? obj.result : "";
+      const historyText = rawText || this.unsolicitedText;
+      const isSilent = historyText.trimStart().startsWith(SILENT_MARKER);
+      const shouldNotify = Boolean(rawText) && rawText !== this.unsolicitedText && !isSilent;
       // Reset jde první a je čistě v paměti (nemůže selhat) — Telegram broadcast
-      // a zápis do historie níž oba dělají I/O a oba mají svůj vlastní try/catch,
-      // aby selhání jednoho (ENOSPC/EACCES, výpadek Telegram API) neshodilo ten
-      // druhý ani nezanechalo dedup stav zaseklý na starém textu.
+      // a zápis do historie níž oba dělají I/O nezávisle na sobě, aby selhání
+      // jednoho (výpadek Telegram API; zápis do souboru už si guard řeší sám
+      // uvnitř `appendHistory`) neshodilo to druhé ani nezanechalo dedup stav
+      // zaseklý na starém textu.
       this.unsolicitedText = "";
       if (shouldNotify) {
         try {
-          this.onUnsolicitedText?.(text);
+          this.onUnsolicitedText?.(rawText);
         } catch (err) {
           console.error("Telegram broadcast unsolicited textu selhal:", err);
         }
       }
-      if (text && !isSilent) {
+      if (historyText && !isSilent) {
         // Zápis do `chat_history.txt` NEZÁVISLE na dedup podmínce výš (ta řeší
         // jen to, aby se do Telegramu neposlal stejný text dvakrát, když
         // `result.result` zopakuje poslední `assistant` blok) — do historie musí
@@ -204,11 +212,7 @@ export class ClaudeProcess {
         // jen tahle finální zpráva, ne streamované mezikroky výš, ať se historie
         // nenafoukne duplicitně. `logTurn`/statistika tahů se sem záměrně
         // nezahrnuje — tenhle tah nemá `usage` data z `runClaude`.
-        try {
-          appendHistory("[cross-session/background událost]", text);
-        } catch (err) {
-          console.error("Zápis unsolicited textu do chat_history.txt selhal:", err);
-        }
+        appendHistory("[cross-session/background událost]", historyText);
       }
     }
   }

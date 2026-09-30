@@ -33,6 +33,18 @@ ale patří to sledovat u hostu s historií OOM (~3,7 GB RAM, viz `META_BOT.md`
 sdílená změna `bridge-ts/src/history.ts` napříč všemi 7 profily — samostatná
 budoucí iterace se svým specem, ne součást týhle.
 
+### `unescapeDelimiter` může smazat genuinní zero-width space v obsahu (zjištěno 21.9., 3. kolo review)
+
+`escapeDelimiter`/`unescapeDelimiter` (`bridge-ts/src/history.ts`) rozlišují
+escapovanou sekvenci od originálu jen bajtově — pokud by text sám o sobě
+obsahoval `"---" + zero-width space + "\n"` (např. vložený z externího zdroje
+s neviditelnými znaky), `unescapeDelimiter` ho při čtení smaže, i když ho
+`escapeDelimiter` nikdy nevložil. Okrajový případ (dvojitá kolize — literální
+`---\n` PLUS zero-width space na stejném místě), neřešeno teď — architektonicky
+čistší oprava je změna formátu (JSON-lines místo textového delimiteru, viz
+review nález "altitude" a zamítnutá alternativa v `DECISIONS.md`), ne další
+vrstva escapování. Sledovat, jestli se v praxi projeví.
+
 ## Rozpracováno
 
 ### Iterace B — watchdog rozliší "neběží" vs. "běží, ale auth nefunguje" (17.9.)
