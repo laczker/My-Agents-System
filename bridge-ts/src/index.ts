@@ -53,8 +53,7 @@ let processing = false;
 // set only when `runClaude` reports `rate_limited`, not for regular errors.
 let rateLimitResumeAtMs: number | null = null;
 let rateLimitTimer: NodeJS.Timeout | null = null;
-// epoch ms of the first `suspected_rate_limited` outcome in the current unbroken streak
-// (null = no active streak) — see `SUSPECTED_RATE_LIMIT_CAP_MS`.
+// epoch ms of the first `suspected_rate_limited` outcome in the current streak, null if none.
 let suspectedRateLimitSinceMs: number | null = null;
 
 function persistQueue(): void {
@@ -76,9 +75,6 @@ function enterRateLimitWait(resetsAtMs: number | null, isRestore = false, isSusp
 
   if (!isRestore) {
     const when = resetsAtMs ? formatResetTimeLocal(resumeAt) : "zkusím to znovu za chvíli, přesný čas obnovení kvóta nehlásila";
-    // `isSuspected`: no `rate_limit_event`/recognizable text came back at all (see
-    // `suspected_rate_limited`) — say so plainly instead of claiming a confirmed limit
-    // that the CLI never actually reported.
     const reason = isSuspected
       ? "Dvakrát za sebou mi Claude vůbec čistě neodpověděl (ani chybou) — vypadá to na vyčerpanou kvótu, i když to tentokrát nebylo hlášené jasně."
       : "Narazil jsem na Claude usage limit.";
@@ -146,10 +142,7 @@ async function processQueue(): Promise<void> {
           enterRateLimitWait(null, false, true);
           return;
         }
-        // Cap exceeded — a real quota would have reset within 5h, so guessing "still the
-        // same outage" for 24h straight is no longer a reasonable bet. Same shape as the
-        // `error` path below (job dropped, user told explicitly) rather than silently
-        // waiting forever on a problem that likely isn't the quota at all.
+        // Cap exceeded — drop the job and tell the user instead of waiting forever.
         suspectedRateLimitSinceMs = null;
         jobQueue.shift();
         persistQueue();

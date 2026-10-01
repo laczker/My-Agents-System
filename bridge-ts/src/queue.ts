@@ -18,11 +18,8 @@ interface QueueState {
    * while waiting for the quota reset, the queue isn't forgotten and doesn't
    * needlessly start hammering the limit again right away. */
   rateLimitResumeAtMs: number | null;
-  /** epoch ms of the first in an unbroken streak of "suspected" (unconfirmed) rate
-   * limit guesses (see `suspected_rate_limited` in claudeProcess.ts) — null when there's
-   * no active streak. Persisted across a bridge restart, same reasoning as
-   * `rateLimitResumeAtMs`, so the cap in index.ts is wall-clock time since the first
-   * suspicion, not reset for free by a crash/redeploy in between. */
+  /** epoch ms of the first in an unbroken streak of `suspected_rate_limited` guesses
+   * (null = no active streak). Persisted so the cap in index.ts survives a restart. */
   suspectedRateLimitSinceMs: number | null;
 }
 
