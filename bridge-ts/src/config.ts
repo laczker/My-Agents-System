@@ -87,3 +87,8 @@ export const USER_TIMEZONE = process.env.USER_TIMEZONE ?? "Europe/Prague";
 export const RATE_LIMIT_FALLBACK_WAIT_MS = 30 * 60_000;
 // A small extra buffer after the reported reset time, so we don't retry right on the edge.
 export const RATE_LIMIT_RESUME_BUFFER_MS = 30_000;
+
+// Cap on how long an unbroken streak of `suspected_rate_limited` guesses keeps
+// silently retrying before giving up and telling the user. A real quota always
+// resets within 5h, so 24h of retries means it's probably not actually the quota.
+export const SUSPECTED_RATE_LIMIT_CAP_MS = 24 * 3600_000;

@@ -18,15 +18,22 @@ interface QueueState {
    * while waiting for the quota reset, the queue isn't forgotten and doesn't
    * needlessly start hammering the limit again right away. */
   rateLimitResumeAtMs: number | null;
+  /** epoch ms of the first in an unbroken streak of `suspected_rate_limited` guesses
+   * (null = no active streak). Persisted so the cap in index.ts survives a restart. */
+  suspectedRateLimitSinceMs: number | null;
 }
 
 export function loadQueueState(): QueueState {
-  if (!existsSync(QUEUE_FILE)) return { jobs: [], rateLimitResumeAtMs: null };
+  if (!existsSync(QUEUE_FILE)) return { jobs: [], rateLimitResumeAtMs: null, suspectedRateLimitSinceMs: null };
   try {
     const parsed = JSON.parse(readFileSync(QUEUE_FILE, "utf-8"));
-    return { jobs: parsed.jobs ?? [], rateLimitResumeAtMs: parsed.rateLimitResumeAtMs ?? null };
+    return {
+      jobs: parsed.jobs ?? [],
+      rateLimitResumeAtMs: parsed.rateLimitResumeAtMs ?? null,
+      suspectedRateLimitSinceMs: parsed.suspectedRateLimitSinceMs ?? null,
+    };
   } catch {
-    return { jobs: [], rateLimitResumeAtMs: null };
+    return { jobs: [], rateLimitResumeAtMs: null, suspectedRateLimitSinceMs: null };
   }
 }
 
