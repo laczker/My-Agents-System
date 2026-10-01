@@ -1,0 +1,33 @@
+# Docker pilot, iterace 5 (personal/devbot/CLAUDE.md) — obraz pro skupinu
+# projektových botů (zatím jen fbalbums), mirror Dockerfile.daily. Absolutní
+# cesty uvnitř kontejneru zrcadlí hostitelské, stejný důvod jako u denní
+# skupiny (.env.<profil> cesty v bridge-ts/src/config.ts).
+FROM node:20-slim
+
+# `git` navíc oproti Dockerfile.daily — fbalbums si otevírá `git worktree`
+# přes EnterWorktree/ExitWorktree nad vlastním produktovým repem
+# (/home/agent/fbalbums) pro svůj vývojový cyklus; bez něj by worktree
+# krok v kontejneru hned selhal na "git: command not found".
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verze pinutá shodně s Dockerfile.daily (claude --version v době psaní) —
+# stejný důvod jako tam, sladit ručně při aktualizaci hostitelského CLI.
+RUN npm install -g @anthropic-ai/claude-code@2.1.280
+
+WORKDIR /home/agent/agent-system/bridge-ts
+COPY bridge-ts/package.json bridge-ts/package-lock.json ./
+RUN npm ci
+COPY bridge-ts/tsconfig.json ./tsconfig.json
+COPY bridge-ts/src ./src
+
+COPY start-project.sh /start-project.sh
+RUN chmod +x /start-project.sh
+
+# Stejný důvod jako Dockerfile.daily: claudeProcess.ts píše
+# bridge_ts_<profil>_claude_stderr.log přímo do /home/agent/agent-system/,
+# mimo bind-mountnuté adresáře — bez vlastnictví padá na EACCES pod
+# user: 1000:1000 (docker-compose.project.yml).
+RUN chown 1000:1000 /home/agent/agent-system
+
+CMD ["/start-project.sh"]

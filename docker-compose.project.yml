@@ -1,0 +1,37 @@
+# Docker pilot, iterace 5 (personal/devbot/CLAUDE.md) — skupina projektových
+# botů (zatím jen fbalbums) v samostatném kontejneru vedle denní skupiny a
+# vedle toho, co běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a
+# bez `restart` policy — stejně jako docker-compose.daily.yml tahle iterace
+# jen ověřuje mechaniku (build, start, čitelnost stavu přes mount, claude CLI
+# auth, git worktree repo mount), migraci živého provozu řeší budoucí iterace.
+services:
+  project-bots:
+    build:
+      context: .
+      dockerfile: Dockerfile.project
+    # Stejný důvod jako docker-compose.daily.yml: musí sedět s hostitelským
+    # uživatelem (agent, uid/gid 1000), jinak soubory zapsané do bind-mountů
+    # (heartbeat, session, fronta, i vlastní commit uvnitř produktového repa)
+    # skončí na hostu vlastněné rootem.
+    user: "1000:1000"
+    environment:
+      - HOME=/home/agent
+    volumes:
+      - ./.env.fbalbums:/home/agent/agent-system/.env.fbalbums:ro
+      - ./personal/fbalbums:/home/agent/agent-system/personal/fbalbums
+      # Read-write, na rozdíl od denní skupiny — fbalbums si sem otevírá
+      # `git worktree` (EnterWorktree/ExitWorktree) pro vlastní vývojový
+      # cyklus, read-only by mu ten krok shodilo hned na startu.
+      - /home/agent/fbalbums:/home/agent/fbalbums
+      # Read-only, stejný důvod jako docker-compose.daily.yml (bind mount
+      # vázaný na inode, ne na cestu — rw mount jednotlivého souboru
+      # nefunguje spolehlivě). Adresářový mount fix je sdílená budoucí
+      # položka pro obě skupiny, viz TASKS.md.
+      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
+      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
+      # Sdílený token s hostem, read-only — stejný důvod jako denní skupina
+      # (cesta natvrdo, ne ${HOME}, aby se nevyhodnotila prázdná mimo
+      # interaktivní shell).
+      - /home/agent/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
+      - /home/agent/.claude.json:/home/agent/.claude.json:ro
+    restart: "no"
