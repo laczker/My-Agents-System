@@ -362,6 +362,26 @@ celého `~/.claude` (jen vybrané 2 soubory, ne `settings.json`/`projects/`/atd.
 kontejneru nepropíše). Boti nadále běží na hostu jako dřív, dokud se explicitně
 neschválí migrace v pozdější iteraci.
 
+Iterace 5 (v repu jako `Dockerfile.project` / `docker-compose.project.yml` /
+`start-project.sh` v kořeni repa, zatím jen `fbalbums`): obraz + compose pro
+skupinu projektových botů, mirror iterací 1–2 denní skupiny (stejný
+`user: "1000:1000"`, stejný `.credentials.json`/`.claude.json` read-only mount,
+stejný `chown` kvůli `EACCES` na stderr log mimo bind-mount). Dvě odlišnosti
+oproti denní skupině: `Dockerfile.project` instaluje `git` (`apt-get install`),
+protože fbalbums si uvnitř otevírá `git worktree` přes `EnterWorktree`/
+`ExitWorktree` nad vlastním produktovým repem — bez CLI by ten krok hned
+selhal; a produktový repo (`/home/agent/fbalbums`) je mountnutý
+**read-write** (na rozdíl od denní skupiny, kde je mimo `personal/<profil>`
+všechno jen read-only), protože worktree cyklus potřebuje do repa zapisovat.
+Ověřeno jen buildem + ověřením, že `git`/`node` binárky v obrazu existují —
+ne startem s reálným Telegram tokenem/mounty (ten test by kolidoval s
+hostovým fbalbums procesem běžícím naživo, stejný `getUpdates` konflikt jako
+u denní skupiny, viz níž) ani plným `git worktree` cyklem uvnitř kontejneru.
+
+Záměrně MIMO rozsah iterace 5 (stejně jako iterací 1–2 denní skupiny):
+napojení na `watchdog.sh`/crontab, migrace živého provozu, Google Drive MCP
+konektor (fbalbums ho používá na fotky) uvnitř kontejneru.
+
 Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-compose.yml` /
 `app.py` v kořeni repa (echo bot z 16.8., viz `personal/assistant/DECISIONS.md`,
 17.8.) — zůstává ležet beze změny, otázka smazat/nahradit je pořád otevřená.
