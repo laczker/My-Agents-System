@@ -150,7 +150,7 @@ async function processQueue(): Promise<void> {
           `⚠️ Claude přes ${Math.round(SUSPECTED_RATE_LIMIT_CAP_MS / 3_600_000)} h opakovaně neodpovídá bez jasné chyby (vypadalo to na vyčerpanou kvótu, ale sama se neobnovila). Úkol jsem zahodil z fronty, napiš prosím znovu.`,
         );
         touchHeartbeat();
-        return;
+        continue;
       }
       suspectedRateLimitSinceMs = null;
       jobQueue.shift();

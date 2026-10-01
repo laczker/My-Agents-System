@@ -269,7 +269,12 @@ Sdílené (a tedy citlivé — chyba tady zasáhne víc botů najednou):
   mezitím nahodil cron — zmatek se přelil na všechny tři boty. Poučení: restart
   cizího bota vždy přes `watchdog.sh` postup, nikdy ručním `tsx src/index.ts`.
 - **Jeden Claude Pro účet** (5h kvóta sdílená napříč všemi boty) — dashboard proto
-  sčítá spotřebu přes všechny boty dohromady, ne per-bot izolovaně.
+  sčítá spotřebu přes všechny boty dohromady, ne per-bot izolovaně. `bridge-ts`
+  (sdílený kód, všech 7 profilů) kromě potvrzeného `rate_limit_event` teď umí i
+  odhadnout vyčerpanou kvótu z opakovaného selhání bez čisté odpovědi (timeout/pád
+  procesu dvakrát za sebou) a napojit se na stejný čekací mechanismus — se stropem
+  24h, pak se úkol zahodí a uživatel je vyzván napsat znovu. Detaily a otevřené
+  otázky (blast radius napříč chaty) v `personal/devbot/DECISIONS.md`.
 - **Server samotný, 3.7GB RAM** — build/dev cyklus (node_modules, TS kompilace, dev
   server běžící trvale) je reálné OOM riziko, ne teoretické — zpravodajova webovka
   takhle jednou spadla. Nové appky/web tooling v tomhle projektu: JS/TS/Node/React
@@ -375,4 +380,6 @@ Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-co
 Plný popis incidentů a jejich oprav (rate limit handling, race condition v
 `ClaudeProcess`, timeout/zombie proces, proaktivní cyklení kontextu, dashboard) je v
 `personal/assistant/DECISIONS.md` — tenhle soubor je destilát pro rychlou orientaci,
-ne náhrada.
+ne náhrada. Novější `bridge-ts` změny (OAuth fallback, Telegram UX, rate-limit
+timeout fallback) se od založení `devbot` (7.9.) zapisují do
+`personal/devbot/DECISIONS.md` místo sem.
