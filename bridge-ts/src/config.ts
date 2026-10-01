@@ -87,3 +87,12 @@ export const USER_TIMEZONE = process.env.USER_TIMEZONE ?? "Europe/Prague";
 export const RATE_LIMIT_FALLBACK_WAIT_MS = 30 * 60_000;
 // A small extra buffer after the reported reset time, so we don't retry right on the edge.
 export const RATE_LIMIT_RESUME_BUFFER_MS = 30_000;
+
+// Cap on how long an unbroken streak of "suspected" (unconfirmed) rate limit guesses
+// (see `suspected_rate_limited` in claudeProcess.ts) is allowed to keep silently
+// retrying in RATE_LIMIT_FALLBACK_WAIT_MS increments before giving up and asking the
+// user instead. Same marker-with-cap shape as the `OUTAGE_CAP_SECONDS` pattern used by
+// the zpravodaj/joby/trener cron scripts, just in-process. A real quota always resets
+// within 5h, so 24h already means dozens of retries found nothing — past that, it's
+// more likely a genuinely broken process than an unreported quota wait.
+export const SUSPECTED_RATE_LIMIT_CAP_MS = 24 * 3600_000;

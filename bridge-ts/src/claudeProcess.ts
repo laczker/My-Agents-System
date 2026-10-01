@@ -20,7 +20,15 @@ export type RunClaudeOutcome =
   | { kind: "ok"; text: string }
   | { kind: "rate_limited"; resetsAtMs: number | null }
   | { kind: "auth_error"; text: string }
-  | { kind: "error"; text: string };
+  | { kind: "error"; text: string }
+  // Both the original attempt and the post-restart retry produced no clean result at
+  // all (timeout or process death, not even an error reply) — see `isNoCleanResultError`.
+  // Treated as a conservative guess at an uncleanly-reported quota exhaustion (incident:
+  // bridge_ts_devbot.log, 2x "neodpověděl včas" with no `rate_limit_event` and no
+  // reply text to match against `looksLikeRateLimitText`), not a confirmed one — the
+  // caller (`processQueue`) routes it into the same wait-for-reset mechanism as
+  // `rate_limited`, but with a fallback wait and a cap on how long it keeps guessing.
+  | { kind: "suspected_rate_limited" };
 
 // The only known pattern so far (incident 14.9.): "Failed to authenticate: OAuth
 // session expired and could not be refreshed" — both regexes must match together, so
@@ -30,6 +38,16 @@ const AUTH_FAILURE_PATTERN = /expired|authenticat/i;
 
 function looksLikeAuthError(text: string): boolean {
   return OAUTH_ERROR_PATTERN.test(text) && AUTH_FAILURE_PATTERN.test(text);
+}
+
+// The two throw sites in `sendAndAwaitResult` for "no clean result at all" — a timeout
+// (deadline hit, no `result` event) or the process dying mid-turn (EOF on stdout).
+// Matched by message rather than an error subclass since both are plain `Error`s raised
+// inline at the throw site, not worth a dedicated type for an internal, same-file check.
+const NO_CLEAN_RESULT_PATTERN = /neodpověděl včas|EOF na stdout/;
+
+function isNoCleanResultError(e: unknown): boolean {
+  return e instanceof Error && NO_CLEAN_RESULT_PATTERN.test(e.message);
 }
 
 /** Prefix a bot can start an unsolicited turn's text with so it does NOT get sent
@@ -384,6 +402,7 @@ export async function runClaude(cp: ClaudeProcess, userText: string, downloadedF
     logTurn({ type: "cycle", ts: new Date().toISOString(), contextTokensAtCycle: cp.getLastContextTokens() });
   }
 
+  let firstAttemptNoCleanResult = false;
   try {
     const { result, isError, rateLimitedAt } = await cp.send(prompt);
     // The quota doesn't come back just because we try again right away — unlike real
@@ -394,6 +413,7 @@ export async function runClaude(cp: ClaudeProcess, userText: string, downloadedF
     if (!isError) return { kind: "ok", text: result };
   } catch (e) {
     console.error("Chyba komunikace s claude procesem:", e);
+    firstAttemptNoCleanResult = isNoCleanResultError(e);
   }
 
   cp.kill();
@@ -405,6 +425,13 @@ export async function runClaude(cp: ClaudeProcess, userText: string, downloadedF
     return { kind: "ok", text: result };
   } catch (e) {
     console.error("Chyba i po restartu claude procesu:", e);
+    // Only when BOTH the original attempt and this retry (on a freshly restarted
+    // process) died the same "no clean result" way — a single isolated timeout stays
+    // a plain `error` (the caller drops the job and reports it), this is specifically
+    // for the back-to-back pattern that looked like a silently-swallowed rate limit.
+    if (firstAttemptNoCleanResult && isNoCleanResultError(e)) {
+      return { kind: "suspected_rate_limited" };
+    }
     return { kind: "error", text: `Nepodařilo se spojit s Claude procesem: ${e}` };
   }
 }

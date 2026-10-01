@@ -18,15 +18,25 @@ interface QueueState {
    * while waiting for the quota reset, the queue isn't forgotten and doesn't
    * needlessly start hammering the limit again right away. */
   rateLimitResumeAtMs: number | null;
+  /** epoch ms of the first in an unbroken streak of "suspected" (unconfirmed) rate
+   * limit guesses (see `suspected_rate_limited` in claudeProcess.ts) — null when there's
+   * no active streak. Persisted across a bridge restart, same reasoning as
+   * `rateLimitResumeAtMs`, so the cap in index.ts is wall-clock time since the first
+   * suspicion, not reset for free by a crash/redeploy in between. */
+  suspectedRateLimitSinceMs: number | null;
 }
 
 export function loadQueueState(): QueueState {
-  if (!existsSync(QUEUE_FILE)) return { jobs: [], rateLimitResumeAtMs: null };
+  if (!existsSync(QUEUE_FILE)) return { jobs: [], rateLimitResumeAtMs: null, suspectedRateLimitSinceMs: null };
   try {
     const parsed = JSON.parse(readFileSync(QUEUE_FILE, "utf-8"));
-    return { jobs: parsed.jobs ?? [], rateLimitResumeAtMs: parsed.rateLimitResumeAtMs ?? null };
+    return {
+      jobs: parsed.jobs ?? [],
+      rateLimitResumeAtMs: parsed.rateLimitResumeAtMs ?? null,
+      suspectedRateLimitSinceMs: parsed.suspectedRateLimitSinceMs ?? null,
+    };
   } catch {
-    return { jobs: [], rateLimitResumeAtMs: null };
+    return { jobs: [], rateLimitResumeAtMs: null, suspectedRateLimitSinceMs: null };
   }
 }
 

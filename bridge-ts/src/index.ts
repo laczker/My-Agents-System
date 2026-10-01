@@ -1,5 +1,5 @@
 import { Bot, GrammyError } from "grammy";
-import { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHAT_IDS, STARTUP_MESSAGE, RATE_LIMIT_FALLBACK_WAIT_MS, RATE_LIMIT_RESUME_BUFFER_MS } from "./config.js";
+import { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHAT_IDS, STARTUP_MESSAGE, RATE_LIMIT_FALLBACK_WAIT_MS, RATE_LIMIT_RESUME_BUFFER_MS, SUSPECTED_RATE_LIMIT_CAP_MS } from "./config.js";
 import { ClaudeProcess, runClaude } from "./claudeProcess.js";
 import { getSessionId } from "./session.js";
 import { appendHistory } from "./history.js";
@@ -53,9 +53,12 @@ let processing = false;
 // set only when `runClaude` reports `rate_limited`, not for regular errors.
 let rateLimitResumeAtMs: number | null = null;
 let rateLimitTimer: NodeJS.Timeout | null = null;
+// epoch ms of the first `suspected_rate_limited` outcome in the current unbroken streak
+// (null = no active streak) — see `SUSPECTED_RATE_LIMIT_CAP_MS`.
+let suspectedRateLimitSinceMs: number | null = null;
 
 function persistQueue(): void {
-  saveQueueState({ jobs: jobQueue, rateLimitResumeAtMs });
+  saveQueueState({ jobs: jobQueue, rateLimitResumeAtMs, suspectedRateLimitSinceMs });
 }
 
 /** Schedules automatic continuation of the queue once the Claude usage limit resets,
@@ -66,15 +69,21 @@ function persistQueue(): void {
  * on the first hit of the limit, and the watchdog can restart more than once per
  * hour, which would otherwise lead to duplicate "still waiting" messages (see
  * `watchdog.log`, historically spammed the user). */
-function enterRateLimitWait(resetsAtMs: number | null, isRestore = false): void {
+function enterRateLimitWait(resetsAtMs: number | null, isRestore = false, isSuspected = false): void {
   const resumeAt = resetsAtMs ?? Date.now() + RATE_LIMIT_FALLBACK_WAIT_MS;
   rateLimitResumeAtMs = resumeAt;
   persistQueue();
 
   if (!isRestore) {
     const when = resetsAtMs ? formatResetTimeLocal(resumeAt) : "zkusím to znovu za chvíli, přesný čas obnovení kvóta nehlásila";
+    // `isSuspected`: no `rate_limit_event`/recognizable text came back at all (see
+    // `suspected_rate_limited`) — say so plainly instead of claiming a confirmed limit
+    // that the CLI never actually reported.
+    const reason = isSuspected
+      ? "Dvakrát za sebou mi Claude vůbec čistě neodpověděl (ani chybou) — vypadá to na vyčerpanou kvótu, i když to tentokrát nebylo hlášené jasně."
+      : "Narazil jsem na Claude usage limit.";
     broadcastMsg(
-      `⏳ Narazil jsem na Claude usage limit. Rozpracovaný úkol zůstává ve frontě, dokončím ho automaticky po obnovení kvóty — ${when}.`,
+      `⏳ ${reason} Rozpracovaný úkol zůstává ve frontě, dokončím ho automaticky po obnovení kvóty — ${when}.`,
     );
   }
 
@@ -126,9 +135,31 @@ async function processQueue(): Promise<void> {
         clearInterval(typingTimer);
       }
       if (outcome.kind === "rate_limited") {
+        suspectedRateLimitSinceMs = null;
         enterRateLimitWait(outcome.resetsAtMs);
         return;
       }
+      if (outcome.kind === "suspected_rate_limited") {
+        const now = Date.now();
+        if (suspectedRateLimitSinceMs === null) suspectedRateLimitSinceMs = now;
+        if (now - suspectedRateLimitSinceMs < SUSPECTED_RATE_LIMIT_CAP_MS) {
+          enterRateLimitWait(null, false, true);
+          return;
+        }
+        // Cap exceeded — a real quota would have reset within 5h, so guessing "still the
+        // same outage" for 24h straight is no longer a reasonable bet. Same shape as the
+        // `error` path below (job dropped, user told explicitly) rather than silently
+        // waiting forever on a problem that likely isn't the quota at all.
+        suspectedRateLimitSinceMs = null;
+        jobQueue.shift();
+        persistQueue();
+        broadcastMsg(
+          `⚠️ Claude přes ${Math.round(SUSPECTED_RATE_LIMIT_CAP_MS / 3_600_000)} h opakovaně neodpovídá bez jasné chyby (vypadalo to na vyčerpanou kvótu, ale sama se neobnovila). Úkol jsem zahodil z fronty, napiš prosím znovu.`,
+        );
+        touchHeartbeat();
+        return;
+      }
+      suspectedRateLimitSinceMs = null;
       jobQueue.shift();
       persistQueue();
       if (outcome.kind === "auth_error") {
@@ -245,6 +276,7 @@ async function startPollingWithRetry(): Promise<void> {
 function restoreQueueState(): void {
   const state = loadQueueState();
   jobQueue.push(...state.jobs);
+  suspectedRateLimitSinceMs = state.suspectedRateLimitSinceMs;
   if (state.rateLimitResumeAtMs === null) return;
 
   if (Date.now() >= state.rateLimitResumeAtMs) {
