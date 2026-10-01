@@ -1,5 +1,30 @@
 # DevBot — otevřené úkoly
 
+## Rozpracováno
+
+### Devbot vlastní pád 1.10. ~13:17–13:18 během hromadného restartu zbylých 6 profilů — příčina nejistá, chytil to cron watchdog
+
+Při `restart_remaining_profiles.sh` (restart assistant/zpravodaj/mailista/joby/
+nakup/fbalbums/trener kvůli nasazení rate-limit timeout fallbacku) spadl i
+**devbotův vlastní proces** (běžící od 12:11 fixu OAuth-env-tokenu, viz
+`personal/assistant/TASKS.md` 1.10.), přestože skript devbota explicitně
+vynechává. Projevilo se to uprostřed odpovídání na "a co tedy máme hotovo?"
+chybou `🔐 Claude autentizace vypadla (OAuth session expired)`, pak proces
+spadl úplně — zachytil to až další pravidelný cron tik `watchdog.sh` v
+13:18:11 (cron byl během skriptu dočasně vypnutý, takže nechytil hned).
+Nový proces (pid ověřen, `CLAUDE_CODE_OAUTH_TOKEN` v environu přítomný) běží
+zdravě od 13:18:11, žádný zásah nebyl potřeba.
+
+**Nejpravděpodobnější příčina (neověřeno přímo, `dmesg` nedostupný bez root):**
+těsná paměť (`free` ukázal ~740 MB volných z 3,7 GB při kontrole) — hromadný
+restart 7 node/tsx procesů naráz je krátkodobý paměťový špičkový nápor, co
+mohl OOM-killerem srazit i nesouvisející devbotův proces. Shoduje se to časově
+přesně s oknem skriptu (cron vypnutý ~13:17–13:19).
+
+**K dořešení:** pokud se to zopakuje, ověřit přímo (`journalctl -k` nebo
+poprosit uživatele o `dmesg` s právy), případně hromadné restarty dělat po
+menších dávkách místo všech 7 najednou, ne čekat na další náhodný incident.
+
 ## Poznámka k procesu
 
 ### `EnterWorktree` větví z `origin/main`, ne z lokálního `main` (zjištěno 17.9., iterace outbox)
@@ -53,7 +78,7 @@ jako obecnou výjimku bez textu k rozpoznání — process-level detekce ve
 watchdogu (iterace B) tenhle případ pokryje, textová detekce v `bridge-ts`
 ne.
 
-### `handleUnsolicitedLine` posílá do Telegramu každý mezikrok zvlášť, ne až finální text (zjištěno 21.9.)
+### `handleUnsolicitedLine` posílá do Telegramu každý mezikrok zvlášť, ne až finální text (zjištěno 21.9., vyřešeno 1.10.)
 
 Při rozboru ztráty kontextu (1ok2ok incident, 21.9.) se odhalilo, že
 `handleUnsolicitedLine` v `bridge-ts/src/claudeProcess.ts` (ř. 140–181) posílá
@@ -79,6 +104,19 @@ bufferovat unsolicited text a poslat souhrnně až na `result`/timeout, s
 výjimkou pro skutečně živé cross-session zprávy — potřeba rozmyslet, jak
 rozlišit "background dokončení mého vlastního subagenta" od "cizí bot mi
 něco poslal", než se z toho udělá spec.
+
+**Vyřešeno (1.10.):** spec se nakonec vyhnul rozlišování původu bloku a místo
+toho se zaměřil na *pozici* v tahu — `handleUnsolicitedLine` teď posílá živě
+jen první `assistant` blok a finální `result` text, ne každý mezikrok mezi
+nimi (`firstBlockSeen` gate, `bridge-ts/src/claudeProcess.ts`). `[TICHO]`
+zůstává funkční jako doplněk pro umlčení i prvního/posledního bloku.
+Implementováno ve worktree (`worktree-unsolicited-first-last`), ověřeno
+offline simulací JSON streamu, `/code-review` bez nálezů, checkpoint
+schválen a smergováno do `main`. Restart devbotova procesu proveden přes
+`restart_devbot.sh` (vypne cron watchdog, kill+restart chain, zapne zpět) —
+heartbeat po restartu je potřeba ověřit v další session (tenhle proces se
+restartem sám nahradí). Ostatních 6 profilů + fbalbums se restart netýkal,
+zůstávají na starém kódu, dokud se neschválí zvlášť.
 
 ### Sebe-restart devbota může zabít vlastní odpověď uprostřed tahu (zjištěno 30.9., incident při restartu po mergi úklidu komentářů)
 
@@ -107,6 +145,54 @@ opakovaně vznáší. Než se bude řešit jako iterace, potřeba spec: (a) jak
 bezpečně zjistit, že finální odpověď už byla `send()`-nuta, než se proces
 smí zabít (např. čekat na zápis do `chat_history.txt` daného tahu, ne pevné
 zpoždění), (b) vždy nejdřív vypnout cron watchdog (viz `DECISIONS.md`).
+
+### Sjednotit základní chování agentů napříč systémem — zatím bez specu (vzneseno 1.10.)
+
+Uživatel (1.10., po incidentu s self-restartem 30.9. a diskuzi o tom, proč
+devbot po rate-limitu sám nenavázal) vznesl širší požadavek: nezajímá ho
+dílčí vysvětlení rozdílu cron-skripty vs. živá `bridge-ts` session, chce
+**sjednotit základní věci a fungování agentů napříč celým systémem** — jmenovitě
+zmínil, že se mu opakovaně stává, že mezikroky (textové poznámky mezi voláními
+nástrojů, ne finální checkpoint) vyjdou do Telegramu anglicky, přestože jazyková
+kázeň (čeština vždy, i technické poznámky) je už domluvená jinde (`CLAUDE.md`
+sekce "Jazyk", a related [[feedback_devops_no_subagent_spam]] pro frekvenci
+mezikroků).
+
+Zatím nemá schválený spec ani přesně vymezený rozsah — "sjednotit fungování
+agentů" je příliš široké na rovnou kódování (viz vlastní pravidlo výš v
+`CLAUDE.md`, iterace musí být malá/recenzovatelná). Než půjde ke specu,
+potřeba od uživatele zúžit: jde čistě o jazykovou kázeň v mezikrocích (dalo by
+se řešit jako rozšíření [[handleUnsolicitedLine]] položky — detekovat/zabránit
+anglickému textu v `broadcastMsg`), nebo chce širší audit konvencí napříč
+`CLAUDE.md` soubory všech profilů? Souvisí s existujícími položkami výš
+(`handleUnsolicitedLine`, sebe-restart) — stejné nadřazené téma "co přesně
+uniká do Telegramu a v jaké podobě".
+
+Rozsah zúžen 1.10.: uživatel chce napřed poslat subagenta, co audituje
+`CLAUDE.md` všech 8 profilů a vypíše konkrétní rozdíly (bez doporučení) —
+podle toho se teprve rozhodne, co sjednotit. Audit běží (zadáno 1.10.).
+
+**Čerstvý konkrétní důkaz (1.10., iterace 5 Docker pilot/fbalbums):** uživatel
+vlepil přímo výpis z vlastního Telegram chatu, co ukazuje obojí porušení
+najednou — mezikroky mezi voláními nástrojů (`These look well-formed...`,
+`All three binaries check out...`) vyšly anglicky, a zároveň přišly jako
+samostatné zprávy (ne jedna úvodní + `[TICHO]` mezikroky + jeden finální
+checkpoint, jak `CLAUDE.md` předepisuje). Potvrzuje to, že `[TICHO]` kázeň
+([[handleUnsolicitedLine]] výš) je křehká napříč celým tahem, ne jen u
+background subagenta — stejná třída selhání, co se stala i 21.9. (4 zprávy
+místo 1). Uživatel to explicitně zadal jako samostatný úkol k vyřešení
+("mimo někam si dej úkol"), ne jen k zapsání — až audit CLAUDE.md dodá
+rozdíly, tohle je konkrétní repro k prioritizaci řešení (pravděpodobně
+směr: `bridge-ts` bufferuje/potlačuje mezikroky strukturálně, ne spoléhání
+na to, že si na `[TICHO]`/češtinu u každého textového bloku vzpomenu sám).
+
+Uživatel zároveň navrhl navazující krok (1.10., zatím jen nápad, ne
+zadání): až se rozdíly sjednotí, sepsat z toho **dokument/šablonu, podle
+které bude `personal/assistant` zakládat nové boty** — tzn. výstup týhle
+položky by neměl být jen jednorázové sladění `CLAUDE.md` souborů, ale i
+trvalý artefakt pro budoucí boty (umístění/formát zatím neurčeno — možná
+`META_BOT.md` dostane novou sekci, možná samostatný soubor). Řešit až po
+auditu a rozhodnutí o sjednocení, ne souběžně.
 
 ## Odloženo
 
