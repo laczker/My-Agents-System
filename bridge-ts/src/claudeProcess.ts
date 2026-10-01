@@ -63,6 +63,11 @@ export class ClaudeProcess {
   // a turn requested by someone other than `send()` (see `handleUnsolicitedLine`).
   private expectingResponse = false;
   private unsolicitedText = "";
+  // Whether the current unsolicited turn has already sent its first live `assistant`
+  // block (see `handleUnsolicitedLine`) — gates live sends to just the first block,
+  // reset alongside `unsolicitedText` at the same two points (new process in `start()`,
+  // end of turn in the `result` handler).
+  private firstBlockSeen = false;
 
   /** `bridge-ts` calls `send()` only for messages coming from Telegram. Cross-session
    * messages (a `SendMessage` from another bot) are delivered by the runtime directly
@@ -123,6 +128,7 @@ export class ClaudeProcess {
     this.waiters = [];
     this.expectingResponse = false;
     this.unsolicitedText = "";
+    this.firstBlockSeen = false;
     this.rl = createInterface({ input: proc.stdout! });
     this.rl.on("line", (line) => {
       if (this.proc === proc) this.onLine(line);
@@ -151,22 +157,28 @@ export class ClaudeProcess {
   }
 
   /** Sends the text of a turn nobody requested through `send()` (typically a reaction
-   * to a cross-session message) into the bot's own Telegram chat — live, after every
-   * `assistant` block, not only at `result`. Such a turn can have several steps
-   * (text → tool → text → ... → result), and an earlier version only sent the last
-   * chunk of text before `result` — intermediate steps (e.g. "got a task from X",
-   * "working on: ...") silently disappeared. Dedup via `unsolicitedText` prevents
-   * sending the same text twice when `result.result` just repeats the last
-   * `assistant` block.
+   * to a cross-session message) into the bot's own Telegram chat — live, but only the
+   * FIRST `assistant` block and the FINAL `result` text, not every block in between.
+   * Such a turn can have several steps (text → tool → text → ... → result); an earlier
+   * version live-sent every intermediate `assistant` block, which meant every working
+   * note in a multi-step turn landed in the user's Telegram as its own message —
+   * confirmed spam of chopped-up, sometimes English mid-turn notes into an otherwise
+   * Czech chat. Now only the opening block ("got a task from X", "working on: ...")
+   * and the closing result are posted live; `firstBlockSeen` gates everything after the
+   * first block. `unsolicitedText` still tracks every block regardless of whether it
+   * was sent live — it's needed both for `result`-vs-last-block dedup below and as the
+   * history fallback when `result.result` is empty/non-string.
    *
    * Exception: text starting with `SILENT_MARKER` is not sent to Telegram at all
-   * (the marker is stripped, the rest discarded). This is for routine, repeated
-   * unsolicited turns (typically a `CronCreate` wakeup in the middle of a bot's own
-   * batch loop, e.g. mailista's nightly mailbox cleanup), where live-posting EVERY
-   * wakeup to Telegram would just be spam — unlike genuine cross-session visibility
-   * (a SendMessage from another bot, start/end of batch work, escalation), which
-   * should keep going out live unchanged. Nothing forces a bot to use the marker —
-   * it's a tool for the bot, not a security mechanism. See META_BOT.md. */
+   * (the marker is stripped, the rest discarded) — even if it's the first block, so a
+   * silent first block still "consumes" the first-block slot without posting anything
+   * live. This is for routine, repeated unsolicited turns (typically a `CronCreate`
+   * wakeup in the middle of a bot's own batch loop, e.g. mailista's nightly mailbox
+   * cleanup), where live-posting EVERY wakeup to Telegram would just be spam — unlike
+   * genuine cross-session visibility (a SendMessage from another bot, start/end of
+   * batch work, escalation), which should keep going out live unchanged. Nothing
+   * forces a bot to use the marker — it's a tool for the bot, not a security
+   * mechanism. See META_BOT.md. */
   private handleUnsolicitedLine(line: string | null): void {
     if (line === null) return;
     const trimmed = line.trim();
@@ -182,7 +194,9 @@ export class ClaudeProcess {
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
         this.unsolicitedText = text;
-        if (!text.trimStart().startsWith(SILENT_MARKER)) {
+        const isFirstBlock = !this.firstBlockSeen;
+        this.firstBlockSeen = true;
+        if (isFirstBlock && !text.trimStart().startsWith(SILENT_MARKER)) {
           try {
             this.onUnsolicitedText?.(text);
           } catch (err) {
@@ -208,6 +222,7 @@ export class ClaudeProcess {
       // inside `appendHistory`) doesn't take down the other or leave the dedup state
       // stuck on the old text.
       this.unsolicitedText = "";
+      this.firstBlockSeen = false;
       if (shouldNotify) {
         try {
           this.onUnsolicitedText?.(rawText);
