@@ -2,6 +2,44 @@
 
 ## Rozpracováno
 
+### `restart_devbot.sh` se umí zabít uprostřed sebe sama — devbot mimo provoz ~40h, cron watchdog vypnutý celosystémově (incident 1.–3.10.)
+
+Restart po mergi `worktree-unsolicited-first-last` (1.10. 14:59:29) proběhl
+přes `restart_devbot.sh` — stejný vzor jako předchozí úspěšný restart dřív
+ten den (10:51, viz `bridge_ts_switch.log`). Tentokrát se ale zastavil hned
+po `kill` kroku: log má `cron watchdog docasne vypnut` (14:59:29) a `devbot
+zastaven` (15:00:29), ale **žádné** `devbot nastartovan` ani `cron watchdog
+znovu zapnut` po něm — skript sám utrpěl stejný osud jako finální odpověď
+popsaná v položce níž ("Sebe-restart devbota může zabít vlastní odpověď").
+Skript běžel jako background proces spuštěný tímtéž `claude -p` tahem, co
+patří do killovaného `devbot` řetězce (`CLAUDE_PID` v skriptu) — kill
+vlastního předka smetl i jeho samotného, dřív než doběhl `nohup npx tsx ...`
+restart a `crontab crontab_backup.txt` re-enable.
+
+**Důsledek, ne jen devbot:** `crontab -l | grep -v watchdog.sh | crontab -`
+zůstalo v platnosti ~40 hodin (1.10. 14:59 → 3.10. ~07:0x) — `watchdog.sh`
+celosystémově neběžel přes cron, takže žádný profil by se nerestartoval při
+padu. `devbot` byl po tu dobu mimo provoz úplně. `assistant` se v
+`watchdog.log` objevuje jako "neběží, restartuji" přesně v 07:03:01 3.10. —
+první tik watchdogu po návratu do crontabu — což naznačuje, že spadl někdy
+během těch 40h a zůstal mrtvý neodhalený, dokud se cron nevrátil (ne přímý
+důsledek tohohle restartu, ale odhalený jeho vedlejším efektem). Jak se
+`watchdog.sh` zpátky do crontabu dostal není v žádném logu zaznamenáno —
+`crontab_backup.txt` (mtime 14:59:29) ho obsahuje, nejpravděpodobnější
+vysvětlení je manuální `crontab crontab_backup.txt` (uživatelem?), ne skript.
+
+**Stav 3.10. ~07:05:** všech 8 profilů + dashboard má čerstvý heartbeat
+(do minuty), cron watchdog aktivní, žádný další zásah nebyl potřeba.
+
+**K dořešení:** `restart_devbot.sh` (a analogické skripty) nesmí být
+spouštěné jako potomek procesu, co sám killuje — potřeba buď odpojit skript
+od `claude -p` řetězce úplně (`setsid`/`at`/systemd-run mimo stávající
+process tree, ne jen `nohup ... & disown` uvnitř stejné bash session), nebo
+pořadí kroků obrátit tak, aby re-enable cronu byl atomický/první, ne poslední
+(selhání uprostřed by pak nechalo watchdog zapnutý, ne vypnutý — fail-safe
+místo fail-open). Souvisí s položkou níž ("Sebe-restart devbota") — stejný
+nadřazený problém, tohle je jeho horší varianta (umírá skript, ne jen reply).
+
 ### Devbot vlastní pád 1.10. ~13:17–13:18 během hromadného restartu zbylých 6 profilů — příčina nejistá, chytil to cron watchdog
 
 Při `restart_remaining_profiles.sh` (restart assistant/zpravodaj/mailista/joby/
