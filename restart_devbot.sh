@@ -79,9 +79,12 @@ CRON_RESTORED=0
 restore_cron() {
   [ "$CRON_RESTORED" = "1" ] && return
   if [ -f "$CRON_BACKUP" ]; then
-    crontab "$CRON_BACKUP"
-    CRON_RESTORED=1
-    log "cron watchdog re-enabled"
+    if crontab "$CRON_BACKUP"; then
+      CRON_RESTORED=1
+      log "cron watchdog re-enabled"
+    else
+      log "WARNING: crontab restore failed, will retry on next call/trap"
+    fi
   fi
 }
 
@@ -101,7 +104,12 @@ log "restart sequence starting (pid $$)"
 
 sleep 60
 
-crontab -l > "$CRON_BACKUP"
+if ! crontab -l > "${CRON_BACKUP}.new" 2>/dev/null; then
+  log "FATAL: cannot read current crontab, aborting before disabling watchdog"
+  send_alert "⚠️ restart_devbot.sh: nepodařilo se přečíst crontab, restart jsem bezpečně odmítl (watchdog zůstal beze změny)."
+  exit 1
+fi
+mv "${CRON_BACKUP}.new" "$CRON_BACKUP"
 crontab -l | grep -v "watchdog.sh" | crontab -
 log "cron watchdog disabled"
 
