@@ -4,7 +4,7 @@
 # personal/devbot/CLAUDE.md). "assistant" is the profile with no argument
 # (backward compatibility, see config.ts).
 # Which profiles start is controlled by $DAILY_PROFILES (space-separated),
-# defaulting to all 5 — iteration 5 (nakup canary cutover) overrides it in
+# defaulting to all 5 — iteration 6 (nakup canary cutover) overrides it in
 # docker-compose.daily.yml to start only "nakup", so the container doesn't
 # also take over assistant/zpravodaj/mailista/joby while their host processes
 # are still the live ones.

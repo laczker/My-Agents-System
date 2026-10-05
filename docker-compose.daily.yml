@@ -3,7 +3,7 @@
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
 # migraci živého provozu řeší až budoucí iterace.
 #
-# Iterace 5 (canary cutover, 5.10.): DAILY_PROFILES omezuje start jen na
+# Iterace 6 (canary cutover, 5.10.): DAILY_PROFILES omezuje start jen na
 # `nakup` — jediný denní profil bez vlastního cron skriptu na hostu, tedy
 # nejnižší riziko kolize stavových souborů. Zbylé 4 profily (assistant,
 # zpravodaj, mailista, joby) pořád běží jen na hostu, dokud se jejich cutover

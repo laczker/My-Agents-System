@@ -43,7 +43,7 @@ if ! pgrep -f "tsx src/index.ts joby" > /dev/null; then
     record_restart "joby" "proces neběžel"
 fi
 
-# nakup iterace 5 (canary cutover, 5.10.) běží v daily-bots kontejneru místo
+# nakup iterace 6 (canary cutover, 5.10.) běží v daily-bots kontejneru místo
 # na hostu. Dvoukrokové hlídání (ne jen pgrep uvnitř kontejneru přímo):
 # 1) `docker compose ps` — pokud selže (daemon nedostupný), jen zalogovat a
 #    nic nerestartovat, ať se netváří, že nakup spadl, když problém je jinde

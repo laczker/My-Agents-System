@@ -12,7 +12,7 @@ export interface BotDef {
   // get CLAUDE_MODEL, so the dashboard shows the actual value instead of a manually
   // duplicated copy that would drift from reality on the next env file change.
   envFile: string;
-  // Set for bots running inside the daily-bots container (canary cutover, iterace 5 —
+  // Set for bots running inside the daily-bots container (canary cutover, iterace 6 —
   // see personal/devbot/TASKS.md). The process lives in the container's own PID
   // namespace, so the restart button must `docker compose exec` into it instead of
   // signaling the host — a plain host pkill matches nothing and silently no-ops.
