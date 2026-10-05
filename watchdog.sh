@@ -43,10 +43,15 @@ if ! pgrep -f "tsx src/index.ts joby" > /dev/null; then
     record_restart "joby" "proces neběžel"
 fi
 
-if ! pgrep -f "tsx src/index.ts nakup" > /dev/null; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
-    nohup npx tsx src/index.ts nakup >> /home/agent/agent-system/bridge_ts_nakup.log 2>&1 &
-    record_restart "nakup" "proces neběžel"
+# nakup iterace 5 (canary cutover, 5.10.) běží v daily-bots kontejneru místo
+# na hostu — hlídá se `docker compose exec` pgrepem uvnitř kontejneru, ne
+# hostovým pgrepem, aby se zachytil i pád procesu v kontejneru, co běží dál
+# (start-daily.sh ho nevyhodí, viz TASKS.md). Zbylé 4 denní profily
+# (assistant, zpravodaj, mailista, joby) pořád běží na hostu beze změny.
+if ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml exec -T daily-bots pgrep -f "tsx src/index.ts nakup" > /dev/null 2>&1; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup, kontejner) neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
+    (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d --force-recreate) >> /home/agent/agent-system/watchdog.log 2>&1
+    record_restart "nakup" "proces v kontejneru neběžel"
 fi
 
 if ! pgrep -f "tsx src/index.ts fbalbums" > /dev/null; then
@@ -71,15 +76,7 @@ if ! pgrep -f "tsx.*/personal/zpravodaj/webapp/server/src/index.ts$" > /dev/null
     (cd /home/agent/agent-system/personal/zpravodaj/webapp/server && nohup npx tsx /home/agent/agent-system/personal/zpravodaj/webapp/server/src/index.ts >> /home/agent/agent-system/zpravodaj_webapp.log 2>&1 &)
 fi
 
-# Daily Docker container (docker-compose.daily.yml) — Docker pilot iteration 4.
-# Deliberately commented out; reason and activation steps in META_BOT.md §4a
-# and personal/devbot/TASKS.md ("Aktivace watchdog restartu kontejneru v cronu").
-#
-# compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
-# if [ $? -ne 0 ]; then
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
-# elif ! echo "$compose_ps_output" | grep -q "^daily-bots$"; then
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') daily-bots kontejner neběží, restartuji" >> /home/agent/agent-system/watchdog.log
-#     (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d) >> /home/agent/agent-system/watchdog.log 2>&1
-#     record_restart "daily-bots-container" "kontejner neběžel"
-# fi
+# Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) přejdou na
+# stejný kontejnerový pattern jako nakup výš až po jejich vlastním schváleném
+# cutoveru — samostatná budoucí iterace, ne vedlejší efekt týhle (viz
+# personal/devbot/TASKS.md, "Aktivace watchdog restartu kontejneru v cronu").
