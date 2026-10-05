@@ -2,6 +2,31 @@
 
 ## Rozpracováno
 
+### Canary cutover `nakup` do daily-bots kontejneru — VYŘEŠENO 5.10.
+
+Schváleno uživatelem (spec + checkpoint, 5.10.): `nakup` jako první denní
+profil migrovaný z hostu do Docker kontejneru (iterace 6, `DAILY_PROFILES=
+nakup` v `docker-compose.daily.yml`, `start-daily.sh` čte proměnnou). Postup:
+1) souběžný test (viz checkpoint kontrola 1, OK), 2) po schválení kill
+hostového `nakup`, 3) `watchdog.sh` přepnutý na kontejnerové hlídání jen pro
+`nakup` (ostatní 4 profily beze změny), 4) `docker compose up -d`.
+
+Při live cutoveru odhalen a hned opraven **kritický bug** — `node:20-slim`
+image (`Dockerfile.daily`) neobsahuje `procps`, tedy žádný `pgrep`/`pkill`.
+Watchdogova kontrola uvnitř kontejneru (`docker compose exec ... pgrep`)
+proto vždycky vracela exit 127 → **každou minutu force-recreate kontejneru**,
+potvrzeno v `watchdog.log` (jeden cyklus proběhl, než se stihlo zasáhnout).
+Oprava: `RUN apt-get install -y procps` do `Dockerfile.daily`, rebuild,
+ověřeno (`pgrep`/`pkill` exit 0 uvnitř), 2 další cron tiky bez dalšího
+force-recreate. Dashboardí restart tlačítko pro `nakup` (`inContainer: true`,
+`exec ... pkill`) mělo stejnou závislost — oprava v stejném kroku.
+
+Stav po iteraci: `nakup` běží v kontejneru, čerstvý heartbeat, žádný
+`409 Conflict` po cutoveru (host proces skutečně dole). Zbylé 4 denní profily
+(assistant, zpravodaj, mailista, joby) pořád na hostu, čekají na vlastní
+schválený cutover — viz "Aktivace watchdog restartu kontejneru v cronu" níž,
+teď už částečně hotové (vzor pro `nakup` existuje a je ověřený naživo).
+
 ### Restart skripty startovaly nový proces sám (`nohup`), dědil env téhle session, ne crontabu — 2× OAuth výpadek 5.10. — VYŘEŠENO 5.10.
 
 Oprava self-killu (viz položka níž) pořád nechávala `restart_devbot.sh` i

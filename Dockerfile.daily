@@ -5,6 +5,14 @@
 # a stavové soubory zůstaly ve stejném formátu pro případnou budoucí migraci.
 FROM node:20-slim
 
+# procps — poskytuje `pgrep`/`pkill`, co node:20-slim samo o sobě nemá.
+# watchdog.sh (iterace 6, canary cutover nakup) se dovnitř `exec`uje a
+# hlídá/restartuje bridge-ts proces tímhle nástrojem; dashboard restart
+# tlačítko ho používá stejně — bez něj by obojí tiše/vždy failovalo (exit 127)
+# a watchdog by kontejner force-recreate-oval při každém minutovém běhu cronu.
+RUN apt-get update && apt-get install -y --no-install-recommends procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # `claude` CLI, připnuté na verzi shodnou s hostem (`claude --version` v době psaní),
 # stejná instalační cesta jako na hostu (globální npm balíček, ne standalone
 # installer) — bridge-ts (claudeProcess.ts) ho spouští jako subprocess
