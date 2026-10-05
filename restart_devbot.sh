@@ -17,13 +17,27 @@
 #      child PIDs" and "kill my whole process group" cleanup styles.
 #      Verified with a throwaway test harness simulating the exact
 #      scenario; see the commit message for the ps pid/ppid evidence.
-#   2. Re-enable the cron watchdog as soon as the new process has been
-#      started, not as the last step gated on the health check below --
-#      shrinks the window where the watchdog is off to roughly the
-#      stop+start step instead of the whole script's runtime. A trap-based
-#      backstop also re-enables it (and alerts) on any unexpected early
-#      exit; this can't help against an unmaskable SIGKILL, but it keeps
-#      the window as short as possible for everything else.
+#   2. Re-enable the cron watchdog as soon as the old process has been
+#      stopped, not as the last step gated on the health check below --
+#      shrinks the window where the watchdog is off to roughly the stop
+#      step instead of the whole script's runtime. A trap-based backstop
+#      also re-enables it (and alerts) on any unexpected early exit; this
+#      can't help against an unmaskable SIGKILL, but it keeps the window as
+#      short as possible for everything else.
+#
+# Incident 5.10. (see personal/assistant/DECISIONS.md, 1.10.): this script
+# used to start the new process itself (`nohup npx tsx ... &` from this
+# bash session), which inherits the environment of whatever invoked the
+# script, not crontab's. Only crontab carries a valid
+# CLAUDE_CODE_OAUTH_TOKEN, so the self-started process ended up with a
+# stale/missing token and failed with "OAuth session expired" twice between
+# 09:04 and 09:35 before the cron watchdog eventually picked it up and
+# fixed it. Fix: this script no longer starts anything -- after stopping
+# the old process and re-enabling the cron watchdog, starting the new one
+# is left entirely to `watchdog.sh` (runs every minute via cron, so it
+# inherits crontab's environment). The health check below now polls for
+# that cron-started process instead of checking a PID this script launched
+# itself.
 set -u
 
 LOG=/home/agent/agent-system/bridge_ts_switch.log
@@ -113,39 +127,75 @@ mv "${CRON_BACKUP}.new" "$CRON_BACKUP"
 crontab -l | grep -v "watchdog.sh" | crontab -
 log "cron watchdog disabled"
 
-CHAIN_PIDS=$(pgrep -f "src/index\.ts devbot" | tr '\n' ' ')
-if [ -n "$CHAIN_PIDS" ]; then
-  CLAUDE_PID=$(ps -eo pid,ppid,cmd | awk -v pids="$CHAIN_PIDS" '
+PGREP_PATTERN="src/index\.ts devbot"
+OLD_CHAIN_PIDS=$(pgrep -f "$PGREP_PATTERN" | tr '\n' ' ')
+if [ -n "$OLD_CHAIN_PIDS" ]; then
+  CLAUDE_PID=$(ps -eo pid,ppid,cmd | awk -v pids="$OLD_CHAIN_PIDS" '
     BEGIN { n = split(pids, a, " "); for (i = 1; i <= n; i++) set[a[i]] = 1 }
     $2 in set && $0 ~ /claude -p/ { print $1 }')
   [ -n "$CLAUDE_PID" ] && kill $CLAUDE_PID 2>/dev/null
-  kill $CHAIN_PIDS 2>/dev/null
-  log "devbot stopped (chain: $CHAIN_PIDS, claude: $CLAUDE_PID)"
+  kill $OLD_CHAIN_PIDS 2>/dev/null
+  log "devbot stopped (chain: $OLD_CHAIN_PIDS, claude: $CLAUDE_PID)"
 else
   log "devbot was not running"
 fi
 sleep 2
 
-if ! cd /home/agent/agent-system/bridge-ts; then
-  log "FATAL: cannot cd to bridge-ts, aborting before start"
-  exit 1
-fi
-nohup npx tsx src/index.ts devbot >> /home/agent/agent-system/bridge_ts_devbot.log 2>&1 &
-disown
-NEWPID=$!
-log "devbot started (pid $NEWPID)"
-
-# Re-enable the watchdog now -- see header comment. If the health check
-# below finds the new process unhealthy, the watchdog is already back on
-# and will pick it up on its own next run.
+# Re-enable the watchdog now -- see header comment. Starting the new
+# process is no longer this script's job (incident 5.10.), so there's no
+# reason to hold the watchdog off any longer than the stop step above.
 restore_cron
 
-sleep 8
-if kill -0 "$NEWPID" 2>/dev/null; then
-  log "devbot pid $NEWPID still running after 8s, looks healthy"
+# --- Health check: wait for the cron watchdog to start a new process -----
+# `watchdog.sh` runs every minute, so a new devbot process can take up to
+# ~60s to appear even when everything works; poll instead of a single
+# fixed sleep. A PID counts as "new" only if it wasn't in OLD_CHAIN_PIDS,
+# since a straggler that ignored the kill above would otherwise look like
+# a successful restart.
+HEALTH_TIMEOUT=90
+HEALTH_INTERVAL=3
+HEARTBEAT_FILE=/home/agent/agent-system/personal/devbot/heartbeat_ts.txt
+elapsed=0
+NEW_PID=""
+while [ "$elapsed" -lt "$HEALTH_TIMEOUT" ]; do
+  CURRENT_PIDS=$(pgrep -f "$PGREP_PATTERN" | tr '\n' ' ')
+  for pid in $CURRENT_PIDS; do
+    case " $OLD_CHAIN_PIDS " in
+      *" $pid "*) ;;
+      *) NEW_PID="$pid" ;;
+    esac
+  done
+  [ -n "$NEW_PID" ] && break
+  sleep "$HEALTH_INTERVAL"
+  elapsed=$((elapsed + HEALTH_INTERVAL))
+done
+
+if [ -z "$NEW_PID" ]; then
+  log "WARNING: no new devbot process detected within ${HEALTH_TIMEOUT}s of cron watchdog restart"
+  send_alert "⚠️ restart_devbot.sh: cron watchdog do ${HEALTH_TIMEOUT}s nenahodil nový proces devbota, zkontroluj bridge_ts_devbot.log a crontab."
 else
-  log "WARNING: devbot pid $NEWPID is no longer running, check bridge_ts_devbot.log"
-  send_alert "⚠️ restart_devbot.sh: nový proces devbota (pid $NEWPID) po 8s už neběží, zkontroluj bridge_ts_devbot.log."
+  log "new devbot process detected (pid $NEW_PID) after ${elapsed}s"
+  # Give the fresh process a bit more time to get through npx/tsx startup
+  # and its first touchHeartbeat() call before judging it unhealthy --
+  # the pgrep match above fires the moment the command line appears, which
+  # can be a few seconds before the process has actually finished booting.
+  HB_OK=0
+  hb_elapsed=0
+  while [ "$hb_elapsed" -lt 20 ]; do
+    HB_TS=$(sed -n 's/.*"ts":\([0-9]*\).*/\1/p' "$HEARTBEAT_FILE" 2>/dev/null)
+    NOW_MS=$(( $(date +%s%N) / 1000000 ))
+    if [ -n "$HB_TS" ] && [ $((NOW_MS - HB_TS)) -ge 0 ] && [ $((NOW_MS - HB_TS)) -lt 30000 ]; then
+      log "devbot heartbeat fresh ($((NOW_MS - HB_TS))ms old)"
+      HB_OK=1
+      break
+    fi
+    sleep 2
+    hb_elapsed=$((hb_elapsed + 2))
+  done
+  if [ "$HB_OK" -ne 1 ]; then
+    log "WARNING: devbot heartbeat missing or stale after ${hb_elapsed}s (file=$HEARTBEAT_FILE, ts=$HB_TS)"
+    send_alert "⚠️ restart_devbot.sh: nový proces devbota (pid $NEW_PID) běží, ale heartbeat vypadá neaktuálně nebo chybí, zkontroluj."
+  fi
 fi
 
 log "restart sequence finished"

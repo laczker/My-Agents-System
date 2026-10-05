@@ -8,16 +8,27 @@
 # profiles, so if assistant itself is the one running it, it would be
 # killing its own ancestor process the same way. Fixed the same way here:
 # self-detach (fork + exit + setsid) before doing anything destructive, and
-# re-enable the cron watchdog as soon as all profiles have been started
+# re-enable the cron watchdog as soon as all profiles have been stopped
 # instead of only after the trailing health-check loop.
 #
+# Incident 5.10. (see personal/assistant/DECISIONS.md, 1.10., and
+# restart_devbot.sh): this script used to start each new process itself
+# (`nohup npx tsx ... &` from this bash session), which inherits the
+# environment of whatever invoked the script, not crontab's -- only
+# crontab carries a valid CLAUDE_CODE_OAUTH_TOKEN. Fix: this script no
+# longer starts anything -- after stopping all 7 old processes and
+# re-enabling the cron watchdog, starting the new ones is left entirely to
+# `watchdog.sh` (runs every minute via cron, so it inherits crontab's
+# environment). The health check below now polls per profile for the
+# cron-started process instead of checking a PID this script launched
+# itself.
+#
 # NOTE (left for a separate iteration, see personal/devbot/TASKS.md): the
-# cron watchdog is still disabled for the whole stop-all-then-start-all
-# loop across all 7 profiles (tens of seconds), not just per profile.
-# Shrinking that further would mean restructuring the loop to
-# disable/stop/start/re-enable per profile, which changes the race-
-# avoidance reasoning for each profile individually -- a bigger, separate
-# change, not done here.
+# cron watchdog is still disabled for the whole stop-all loop across all 7
+# profiles (tens of seconds), not just per profile. Shrinking that further
+# would mean restructuring the loop to disable/stop/re-enable per profile,
+# which changes the race-avoidance reasoning for each profile individually
+# -- a bigger, separate change, not done here.
 set -u
 
 LOG=/home/agent/agent-system/bridge_ts_switch.log
@@ -103,11 +114,16 @@ mv "${CRON_BACKUP}.new" "$CRON_BACKUP"
 crontab -l | grep -v "watchdog.sh" | crontab -
 log "cron watchdog disabled"
 
+declare -A OLD_PIDS
+declare -A PATTERNS
+
 stop_profile() {
   local profile_label="$1"
   local pgrep_pattern="$2"
+  PATTERNS[$profile_label]="$pgrep_pattern"
   local CHAIN_PIDS
   CHAIN_PIDS=$(pgrep -f "$pgrep_pattern" | tr '\n' ' ')
+  OLD_PIDS[$profile_label]="$CHAIN_PIDS"
   if [ -n "$CHAIN_PIDS" ]; then
     local CLAUDE_PID
     CLAUDE_PID=$(ps -eo pid,ppid,cmd | awk -v pids="$CHAIN_PIDS" '
@@ -136,45 +152,92 @@ sleep 3
 stop_profile "trener" 'src/index\.ts trener'
 sleep 2
 
-if ! cd /home/agent/agent-system/bridge-ts; then
-  log "FATAL: cannot cd to bridge-ts, aborting before start"
-  exit 1
-fi
-
-declare -A PIDS
-start_profile() {
-  local profile_label="$1"
-  local arg="$2"
-  local logfile="$3"
-  nohup npx tsx src/index.ts $arg >> "$logfile" 2>&1 &
-  disown
-  PIDS[$profile_label]=$!
-  log "$profile_label started (pid ${PIDS[$profile_label]})"
-  sleep 5
-}
-
-start_profile "assistant" "" /home/agent/agent-system/bridge_ts.log
-start_profile "zpravodaj" "zpravodaj" /home/agent/agent-system/bridge_ts_zpravodaj.log
-start_profile "mailista" "mailista" /home/agent/agent-system/bridge_ts_mailista.log
-start_profile "joby" "joby" /home/agent/agent-system/bridge_ts_joby.log
-start_profile "nakup" "nakup" /home/agent/agent-system/bridge_ts_nakup.log
-start_profile "fbalbums" "fbalbums" /home/agent/agent-system/bridge_ts_fbalbums.log
-start_profile "trener" "trener" /home/agent/agent-system/bridge_ts_trener.log
-
-# Re-enable the watchdog now that all profiles have been (re)started --
-# see header comment and restart_devbot.sh. The health check below still
-# runs after this, so a failure there is still logged and alerted, but the
-# watchdog is no longer held hostage to that check succeeding.
+# Re-enable the watchdog now that all 7 old processes have been stopped --
+# see header comment. Starting new ones is no longer this script's job
+# (incident 5.10.), so there's no reason to hold the watchdog off any
+# longer than the stop loop above.
 restore_cron
 
-sleep 8
+# --- Health check: wait for the cron watchdog to start new processes -----
+# `watchdog.sh` runs every minute, so each new process can take up to ~60s
+# to appear even when everything works; poll instead of a single fixed
+# sleep. A PID counts as "new" only if it wasn't recorded in OLD_PIDS for
+# that profile, since a straggler that ignored the kill above would
+# otherwise look like a successful restart.
+declare -A HEARTBEAT_FILES=(
+  [assistant]=/home/agent/agent-system/personal/assistant/heartbeat_ts.txt
+  [zpravodaj]=/home/agent/agent-system/personal/zpravodaj/heartbeat_ts.txt
+  [mailista]=/home/agent/agent-system/personal/mailista/heartbeat_ts.txt
+  [joby]=/home/agent/agent-system/personal/joby/heartbeat_ts.txt
+  [nakup]=/home/agent/agent-system/personal/nakup/heartbeat_ts.txt
+  [fbalbums]=/home/agent/agent-system/personal/fbalbums/heartbeat_ts.txt
+  [trener]=/home/agent/agent-system/personal/trener/heartbeat_ts.txt
+)
+
+is_new_pid() {
+  local label="$1"
+  local pid="$2"
+  case " ${OLD_PIDS[$label]} " in
+    *" $pid "*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+HEALTH_TIMEOUT=90
+HEALTH_INTERVAL=3
+declare -A NEW_PIDS
+PENDING="assistant zpravodaj mailista joby nakup fbalbums trener"
+elapsed=0
+while [ "$elapsed" -lt "$HEALTH_TIMEOUT" ] && [ -n "$PENDING" ]; do
+  STILL_PENDING=""
+  for label in $PENDING; do
+    CURRENT_PIDS=$(pgrep -f "${PATTERNS[$label]}" | tr '\n' ' ')
+    found=""
+    for pid in $CURRENT_PIDS; do
+      if is_new_pid "$label" "$pid"; then
+        found="$pid"
+      fi
+    done
+    if [ -n "$found" ]; then
+      NEW_PIDS[$label]="$found"
+    else
+      STILL_PENDING="$STILL_PENDING $label"
+    fi
+  done
+  PENDING="${STILL_PENDING# }"
+  [ -z "$PENDING" ] && break
+  sleep "$HEALTH_INTERVAL"
+  elapsed=$((elapsed + HEALTH_INTERVAL))
+done
+
 for label in assistant zpravodaj mailista joby nakup fbalbums trener; do
-  pid="${PIDS[$label]}"
-  if kill -0 "$pid" 2>/dev/null; then
-    log "$label pid $pid still running after 8s, looks healthy"
-  else
-    log "WARNING: $label pid $pid is no longer running, check its log"
-    send_alert "⚠️ restart_remaining_profiles.sh: $label (pid $pid) po 8s už neběží, zkontroluj log."
+  pid="${NEW_PIDS[$label]:-}"
+  if [ -z "$pid" ]; then
+    log "WARNING: no new $label process detected within ${HEALTH_TIMEOUT}s of cron watchdog restart"
+    send_alert "⚠️ restart_remaining_profiles.sh: cron watchdog do ${HEALTH_TIMEOUT}s nenahodil nový proces $label, zkontroluj log a crontab."
+    continue
+  fi
+  log "new $label process detected (pid $pid)"
+  # Give the fresh process a bit more time to get through npx/tsx startup
+  # and its first touchHeartbeat() call before judging it unhealthy -- see
+  # restart_devbot.sh for the same reasoning.
+  hb_file="${HEARTBEAT_FILES[$label]}"
+  HB_OK=0
+  hb_elapsed=0
+  while [ "$hb_elapsed" -lt 20 ]; do
+    HB_TS=$(sed -n 's/.*"ts":\([0-9]*\).*/\1/p' "$hb_file" 2>/dev/null)
+    NOW_MS=$(( $(date +%s%N) / 1000000 ))
+    if [ -n "$HB_TS" ] && [ $((NOW_MS - HB_TS)) -ge 0 ] && [ $((NOW_MS - HB_TS)) -lt 30000 ]; then
+      log "$label heartbeat fresh ($((NOW_MS - HB_TS))ms old)"
+      HB_OK=1
+      break
+    fi
+    sleep 2
+    hb_elapsed=$((hb_elapsed + 2))
+  done
+  if [ "$HB_OK" -ne 1 ]; then
+    log "WARNING: $label heartbeat missing or stale after ${hb_elapsed}s (file=$hb_file, ts=$HB_TS)"
+    send_alert "⚠️ restart_remaining_profiles.sh: nový proces $label (pid $pid) běží, ale heartbeat vypadá neaktuálně nebo chybí, zkontroluj."
   fi
 done
 
