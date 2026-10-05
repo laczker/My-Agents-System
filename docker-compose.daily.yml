@@ -1,9 +1,14 @@
 # Docker pilot, iterace 1+2+3 (personal/devbot/CLAUDE.md) — skupina denních botů
 # (assistant, zpravodaj, mailista, joby, nakup) v jednom kontejneru vedle toho, co
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
-# tahle iterace jen ověřuje mechaniku (build, start, čitelnost stavu přes volume
-# mount, claude CLI auth, sdílené dokumenty), migraci živého provozu řeší až
-# budoucí iterace.
+# migraci živého provozu řeší až budoucí iterace.
+#
+# Iterace 5 (canary cutover, 5.10.): DAILY_PROFILES omezuje start jen na
+# `nakup` — jediný denní profil bez vlastního cron skriptu na hostu, tedy
+# nejnižší riziko kolize stavových souborů. Zbylé 4 profily (assistant,
+# zpravodaj, mailista, joby) pořád běží jen na hostu, dokud se jejich cutover
+# neschválí zvlášť. Až k tomu dojde, řádek s DAILY_PROFILES stačí smazat
+# (start-daily.sh defaultuje zpět na všech 5).
 services:
   daily-bots:
     build:
@@ -17,6 +22,7 @@ services:
     user: "1000:1000"
     environment:
       - HOME=/home/agent
+      - DAILY_PROFILES=nakup
     volumes:
       - ./.env:/home/agent/agent-system/.env:ro
       - ./.env.zpravodaj:/home/agent/agent-system/.env.zpravodaj:ro
