@@ -2,7 +2,7 @@
 
 ## Rozpracováno
 
-### `restart_devbot.sh` se umí zabít uprostřed sebe sama — devbot mimo provoz ~40h, cron watchdog vypnutý celosystémově (incident 1.–3.10.)
+### `restart_devbot.sh` se umí zabít uprostřed sebe sama — devbot mimo provoz ~40h, cron watchdog vypnutý celosystémově (incident 1.–3.10.) — VYŘEŠENO 5.10.
 
 Restart po mergi `worktree-unsolicited-first-last` (1.10. 14:59:29) proběhl
 přes `restart_devbot.sh` — stejný vzor jako předchozí úspěšný restart dřív
@@ -31,14 +31,31 @@ vysvětlení je manuální `crontab crontab_backup.txt` (uživatelem?), ne skrip
 **Stav 3.10. ~07:05:** všech 8 profilů + dashboard má čerstvý heartbeat
 (do minuty), cron watchdog aktivní, žádný další zásah nebyl potřeba.
 
-**K dořešení:** `restart_devbot.sh` (a analogické skripty) nesmí být
-spouštěné jako potomek procesu, co sám killuje — potřeba buď odpojit skript
-od `claude -p` řetězce úplně (`setsid`/`at`/systemd-run mimo stávající
-process tree, ne jen `nohup ... & disown` uvnitř stejné bash session), nebo
-pořadí kroků obrátit tak, aby re-enable cronu byl atomický/první, ne poslední
-(selhání uprostřed by pak nechalo watchdog zapnutý, ne vypnutý — fail-safe
-místo fail-open). Souvisí s položkou níž ("Sebe-restart devbota") — stejný
-nadřazený problém, tohle je jeho horší varianta (umírá skript, ne jen reply).
+**Vyřešeno 5.10.** (branch `worktree-restart-devbot-selfkill-fix`, smergováno
+do `main`): `restart_devbot.sh` i `restart_remaining_profiles.sh` se teď na
+startu odpojí od volajícího process tree (`setsid` guarded re-exec — fork,
+rodič hned skončí, potomek běží v nové session, immune na "kill child PIDs"
+i "kill celé process group"), re-enable cron watchdogu proběhne hned po
+startu nového procesu/profilů, ne až na konci (fail-safe místo fail-open),
+plus `trap ... EXIT` backstop pro neočekávané přerušení a aktivní Telegram
+alert (`send_alert`) při selhání. `/code-review` navíc odhalil a oprava řeší
+tichou chybu v `restore_cron()` (nastavovala `CRON_RESTORED=1` i při
+neúspěšném `crontab`, takže retry se nikdy nespustil) a zpevnila zápis
+`crontab_backup.txt` (`.new` + `mv`, aby transientní chyba při čtení
+nesmazala existující dobrou zálohu). Oba skripty byly dosud needitované v
+gitu — tímto commitem poprvé verzované. Ověřeno na živém restartu devbota
+při téhle iteraci (viz chat_history kolem 5.10.) + testovacím harnessem
+simulujícím self-kill scénář (ps pid/ppid/sid před/po).
+
+Zbývá jako samostatné budoucí položky (záměrně mimo scope téhle iterace):
+`pgrep -f "src/index\.ts devbot"` dělá substring match na celý command line
+(teoreticky by mohl zabít nesouvisející proces se shodným textem v promptu —
+existovalo už dřív, jiná třída chyby); `restart_remaining_profiles.sh` má
+pořád desítky sekund okno s vypnutým cronem přes všech 7 profilů najednou,
+ne per-profil (viz komentář ve skriptu). Souvisí s položkou níž ("Sebe-restart
+devbota") — stejný nadřazený problém, tohle byla jeho horší varianta (umírá
+skript, ne jen reply); timing problém sebe-restartu useknutí vlastní odpovědi
+zůstává otevřený samostatně.
 
 ### Devbot vlastní pád 1.10. ~13:17–13:18 během hromadného restartu zbylých 6 profilů — příčina nejistá, chytil to cron watchdog
 
@@ -151,10 +168,38 @@ zůstává funkční jako doplněk pro umlčení i prvního/posledního bloku.
 Implementováno ve worktree (`worktree-unsolicited-first-last`), ověřeno
 offline simulací JSON streamu, `/code-review` bez nálezů, checkpoint
 schválen a smergováno do `main`. Restart devbotova procesu proveden přes
-`restart_devbot.sh` (vypne cron watchdog, kill+restart chain, zapne zpět) —
-heartbeat po restartu je potřeba ověřit v další session (tenhle proces se
-restartem sám nahradí). Ostatních 6 profilů + fbalbums se restart netýkal,
-zůstávají na starém kódu, dokud se neschválí zvlášť.
+`restart_devbot.sh` (vypne cron watchdog, kill+restart chain, zapne zpět).
+Ostatních 6 profilů + fbalbums se restart netýkal, zůstávají na starém kódu,
+dokud se neschválí zvlášť.
+
+**Incident (zjištěno a opraveno 3.10., asistentem):** `restart_devbot.sh`
+spuštěný 1.10. 14:59 se zasekl přesně v místě, co předchozí review jen
+opatrně odhadovalo — `bridge_ts_switch.log` končí na řádku "cron watchdog
+docasne vypnut" a "devbot zastaven", ale chybí "nastartovan" i "cron
+watchdog znovu zapnut". Skript po killu starého procesu nikdy nedoběhl do
+konce (přesná příčina procesu samotného neznámá — nevypsal žádnou chybu,
+jen zmizel), takže **devbot byl mrtvý přes 2 dny (1.10. 15:00 → 3.10.) a
+cron watchdog byl celou dobu vyřazený z crontabu** (`crontab -l` bez
+`watchdog.sh` řádku) — proto ho nikdo/nic nenahodilo zpátky. Oprava: `crontab
+/home/agent/agent-system/crontab_backup.txt` (zálohovaný skriptem těsně
+před vypnutím, obsahoval watchdog řádku správně), pak ruční start procesu.
+Po startu se objevil `409 Conflict` na `getUpdates` (starý Telegram
+long-poll ještě doznívající) — vyřešilo se samo po pár desítkách sekund
+backoffu (`STARTUP_409_RETRY_DELAYS_MS`), žádný webhook ani cizí proces to
+nezpůsoboval (ověřeno `getWebhookInfo`, `docker ps`, `ss -tnp`). Heartbeat
+od 3.10. 7:05 běží zdravě.
+
+**Důležitější zjištění pro budoucno:** tenhle incident je přesně ten typ
+selhání, co `personal/assistant/CLAUDE.md` (sekce "Skripty mimo bridge-ts")
+popisuje — skript běžící mimo `bridge-ts`/cron, co při chybě tiše zmizí bez
+jakéhokoliv upozornění, takže to nikdo nezachytí, dokud se nezeptá uživatel.
+`restart_devbot.sh` i `restart_remaining_profiles.sh` (oba v rootu repa) mají
+stejnou slabinu: pokud skript spadne/zůstane trčet mezi "vypnout cron
+watchdog" a "zapnout zpět", systém zůstane bez supervize neomezeně dlouho a
+nikdo se to nedozví. Do budoucna by obě měly mít `trap` na EXIT/ERR, co
+cron watchdog vrátí zpátky za každou cenu (ne jen na konci happy path), a
+ideálně i poslat Telegram/SendMessage upozornění, pokud se skript nedokončí
+v očekávaném čase.
 
 ### Sebe-restart devbota může zabít vlastní odpověď uprostřed tahu (zjištěno 30.9., incident při restartu po mergi úklidu komentářů)
 
