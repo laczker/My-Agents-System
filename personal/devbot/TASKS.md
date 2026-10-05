@@ -2,6 +2,52 @@
 
 ## Rozpracováno
 
+### Restart skripty startovaly nový proces sám (`nohup`), dědil env téhle session, ne crontabu — 2× OAuth výpadek 5.10. — VYŘEŠENO 5.10.
+
+Oprava self-killu (viz položka níž) pořád nechávala `restart_devbot.sh` i
+`restart_remaining_profiles.sh` startovat nový proces samy (`nohup npx tsx
+... &` z vlastní bash session). Po schváleném mergi a restartu 5.10. ~09:03
+to způsobilo přesně tohle: nový proces zdědil environment *agentní session*,
+ne crontabu, takže běžel bez platného `CLAUDE_CODE_OAUTH_TOKEN` → dva dotazy
+uživatele ("povedlo se?", "jsi tu?") spadly na `OAuth session expired`
+(09:04–09:35), než ho cron `watchdog.sh` o ~30 min později nahodil správně.
+Přesně odpovídá rozhodnutí z 1.10. v `personal/assistant/DECISIONS.md`
+("vlastní restartovací skripty mimo cron nesmí sám spouštět nový proces"),
+které tahle oprava tiše porušovala.
+
+**Vyřešeno 5.10.** (branch `worktree-restart-scripts-no-selfstart`,
+smergováno do `main` jako `7ecc2bc`): oba skripty po zabití starého procesu
+už nic nestartují samy — `restore_cron()` se volá hned po killu, health-check
+polluje až 90s na proces nahozený `watchdog.sh` (přes cron, tedy se správným
+environem) a navíc ověřuje čerstvost heartbeatu, ne jen že PID běží.
+`/code-review` (high) našel 4 nálezy, žádný blokující, žádný v scope týhle
+iterace — zapsány jako samostatné poznámky níž.
+
+**Ověření na živém devbotovi (5.10. ~12:41–12:43):** první pokus o test
+(`bash restart_devbot.sh`, relativní cesta bez `./`) skončil zdánlivě
+úspěšně (exit 0), ale **self-detach ve skutečnosti neproběhl** —
+`setsid "$0" "$@"` s `$0` bez `/` dělá `execvp` PATH lookup na holé jméno
+souboru, ten v `PATH` není, takže `setsid` selhal (`No such file or
+directory` v logu bez timestampu, mimo `log()`) a celá reálná práce skriptu
+se nikdy nespustila; cron ani proces zůstaly nedotčené (ověřeno — starý PID
+běžel dál). Druhý pokus s absolutní cestou
+(`/home/agent/agent-system/restart_devbot.sh`) proběhl správně: starý proces
+zabit 12:42:15, cron re-enable 12:42:17, nový proces nahozený
+`watchdog.sh` detekován 12:43:03 (45s), heartbeat čerstvý. `/proc/<pid>
+/environ` nového procesu obsahuje platný `CLAUDE_CODE_OAUTH_TOKEN` — potvrzeno,
+že ho skutečně nastartoval cron (se správným environem), ne tahle session.
+
+**Nový nález, zatím neopravený (vedlejší produkt testu, ne scope týhle
+iterace):** self-detach (`setsid "$0" "$@"`) tiše neudělá nic, pokud je
+skript spuštěný tak, že `$0` nemá v sobě `/` (např. `bash restart_devbot.sh`
+z adresáře, místo `./restart_devbot.sh` nebo absolutní cesty) — `exit 0` z
+obalu vypadá jako úspěch, ale reálný restart se nestane a žádný alert se
+nepošle (chyba padne mimo `send_alert`/`log()` cestu). V produkčním použití
+agentem by k tomu nemělo dojít, pokud se skript vždy volá s cestou, ale je to
+fragilní tiché selhání stojící za budoucí malou opravu (např. `readlink -f
+"$0"` před self-detach re-execem). Netýká se `restart_remaining_profiles.sh`
+stejně — needitováno, needověřeno, zmiňuju jen jako stejnou třídu rizika.
+
 ### `restart_devbot.sh` se umí zabít uprostřed sebe sama — devbot mimo provoz ~40h, cron watchdog vypnutý celosystémově (incident 1.–3.10.) — VYŘEŠENO 5.10.
 
 Restart po mergi `worktree-unsolicited-first-last` (1.10. 14:59:29) proběhl
@@ -276,6 +322,24 @@ položky by neměl být jen jednorázové sladění `CLAUDE.md` souborů, ale i
 trvalý artefakt pro budoucí boty (umístění/formát zatím neurčeno — možná
 `META_BOT.md` dostane novou sekci, možná samostatný soubor). Řešit až po
 auditu a rozhodnutí o sjednocení, ne souběžně.
+
+**Další recidiva (5.10., nahlásil uživatel asistentovi):** čerstvý úryvek z
+Telegram chatu ukazuje stejné porušení znovu, i po mergi `firstBlockSeen`
+fixu z 1.10. — mezikroky typu `Worktree created manually via git worktree
+add...`, `Good, no stray test processes remain...` vyšly anglicky a jako
+samostatné zprávy, ne jen úvod + finální checkpoint. Buď fix nedrží v praxi,
+nebo tenhle konkrétní výstup (vývojářský subagent spuštěný na pozadí) jde
+jinou cestou než `handleUnsolicitedLine` předpokládá. Současně uživatel
+nahlásil dva další, dosud jen částečně zdokumentované projevy téhož
+nadřazeného tématu: po restartu devbot sám nenavazuje na rozdělanou práci
+(viz "Sebe-restart devbota může zabít vlastní odpověď" výš) a nedává aktivně
+vědět, že se něco změnilo (restart proběhl / práce se ztratila) — ticho bez
+signálu, přesně typ selhání z `personal/assistant/CLAUDE.md` sekce "Skripty
+mimo bridge-ts".
+
+Zapsáno jen jako další důkaz k existující otevřené položce — **uživatel
+výslovně řekl, ať se to teď neřeší** (žádná akce, žádné zadání devbotovi),
+jen to má být v `TASKS.md` pro příští kolo, až se spec dořeší.
 
 ## Odloženo
 
