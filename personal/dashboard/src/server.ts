@@ -254,10 +254,20 @@ export function startServer(): void {
       // Same safe procedure as the manual restart on 18.8.: SIGTERM to matching
       // processes, leaving the actual bring-up to the cron `watchdog.sh` (within a minute).
       // pkill returns exit 1 when it finds nothing — that's not an error, just a no-op.
+      // `inContainer` bots (canary cutover, iterace 5) live in daily-bots' own PID
+      // namespace, so the signal has to go in via `docker compose exec`, not the host.
       try {
-        execFileSync("pkill", ["-TERM", "-f", bot.killPattern]);
+        if (bot.inContainer) {
+          execFileSync("docker", [
+            "compose", "-f", "/home/agent/agent-system/docker-compose.daily.yml",
+            "exec", "-T", "daily-bots", "pkill", "-TERM", "-f", bot.killPattern,
+          ]);
+        } else {
+          execFileSync("pkill", ["-TERM", "-f", bot.killPattern]);
+        }
       } catch {
-        // no-op: the process wasn't running
+        // no-op: the process wasn't running (or, for inContainer, the container itself
+        // wasn't up — watchdog.sh's own container check handles bringing it back)
       }
       res.writeHead(303, { Location: "/" });
       res.end();

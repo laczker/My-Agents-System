@@ -12,6 +12,11 @@ export interface BotDef {
   // get CLAUDE_MODEL, so the dashboard shows the actual value instead of a manually
   // duplicated copy that would drift from reality on the next env file change.
   envFile: string;
+  // Set for bots running inside the daily-bots container (canary cutover, iterace 5 —
+  // see personal/devbot/TASKS.md). The process lives in the container's own PID
+  // namespace, so the restart button must `docker compose exec` into it instead of
+  // signaling the host — a plain host pkill matches nothing and silently no-ops.
+  inContainer?: boolean;
 }
 
 export const BOTS: BotDef[] = [
@@ -19,7 +24,7 @@ export const BOTS: BotDef[] = [
   { name: "zpravodaj", dir: "/home/agent/agent-system/personal/zpravodaj", killPattern: "tsx src/index.ts zpravodaj", envFile: "/home/agent/agent-system/.env.zpravodaj" },
   { name: "mailista", dir: "/home/agent/agent-system/personal/mailista", killPattern: "tsx src/index.ts mailista", envFile: "/home/agent/agent-system/.env.mailista" },
   { name: "joby", dir: "/home/agent/agent-system/personal/joby", killPattern: "tsx src/index.ts joby", envFile: "/home/agent/agent-system/.env.joby" },
-  { name: "nakup", dir: "/home/agent/agent-system/personal/nakup", killPattern: "tsx src/index.ts nakup", envFile: "/home/agent/agent-system/.env.nakup" },
+  { name: "nakup", dir: "/home/agent/agent-system/personal/nakup", killPattern: "tsx src/index.ts nakup", envFile: "/home/agent/agent-system/.env.nakup", inContainer: true },
   { name: "fbalbums", dir: "/home/agent/agent-system/personal/fbalbums", killPattern: "tsx src/index.ts fbalbums", envFile: "/home/agent/agent-system/.env.fbalbums" },
   { name: "devbot", dir: "/home/agent/agent-system/personal/devbot", killPattern: "tsx src/index.ts devbot", envFile: "/home/agent/agent-system/.env.devbot" },
 ];

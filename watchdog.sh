@@ -44,12 +44,24 @@ if ! pgrep -f "tsx src/index.ts joby" > /dev/null; then
 fi
 
 # nakup iterace 5 (canary cutover, 5.10.) běží v daily-bots kontejneru místo
-# na hostu — hlídá se `docker compose exec` pgrepem uvnitř kontejneru, ne
-# hostovým pgrepem, aby se zachytil i pád procesu v kontejneru, co běží dál
-# (start-daily.sh ho nevyhodí, viz TASKS.md). Zbylé 4 denní profily
-# (assistant, zpravodaj, mailista, joby) pořád běží na hostu beze změny.
-if ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml exec -T daily-bots pgrep -f "tsx src/index.ts nakup" > /dev/null 2>&1; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup, kontejner) neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
+# na hostu. Dvoukrokové hlídání (ne jen pgrep uvnitř kontejneru přímo):
+# 1) `docker compose ps` — pokud selže (daemon nedostupný), jen zalogovat a
+#    nic nerestartovat, ať se netváří, že nakup spadl, když problém je jinde
+#    (stejná opatrnost jako u iterace 4, viz META_BOT.md §4a); pokud kontejner
+#    neběží, normální `up -d`.
+# 2) teprve když kontejner běží, `exec` pgrep na konkrétní proces uvnitř —
+#    zachytí i pád procesu, co kontejner (start-daily.sh/wait) sám nevyhodí.
+# Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) pořád běží na
+# hostu beze změny.
+compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
+if [ $? -ne 0 ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
+elif ! echo "$compose_ps_output" | grep -q "^daily-bots$"; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') daily-bots kontejner neběží, restartuji" >> /home/agent/agent-system/watchdog.log
+    (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d) >> /home/agent/agent-system/watchdog.log 2>&1
+    record_restart "nakup" "kontejner neběžel"
+elif ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml exec -T daily-bots pgrep -f "tsx src/index.ts nakup" > /dev/null 2>&1; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup, kontejner) proces neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
     (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d --force-recreate) >> /home/agent/agent-system/watchdog.log 2>&1
     record_restart "nakup" "proces v kontejneru neběžel"
 fi

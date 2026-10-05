@@ -386,6 +386,30 @@ Nesouvisí s tímhle: starší nepoužívaný prototyp `Dockerfile` / `docker-co
 `app.py` v kořeni repa (echo bot z 16.8., viz `personal/assistant/DECISIONS.md`,
 17.8.) — zůstává ležet beze změny, otázka smazat/nahradit je pořád otevřená.
 
+Iterace 6 (canary cutover `nakup`, 5.10.): první skutečná migrace živého
+provozu z hostu do `daily-bots` kontejneru — dřív jen ověřená mechanika, teď
+prod. `nakup` zvolen jako první, protože je jediný z denní skupiny bez
+vlastního samostatného cron skriptu na hostu (na rozdíl od joby/mailista/
+zpravodaj/trenér), tedy nejnižší riziko kolize stavových souborů mezi hostem
+a kontejnerem. `docker-compose.daily.yml` dostal `DAILY_PROFILES=nakup`
+(`start-daily.sh` teď čte `$DAILY_PROFILES`, default beze změny = všech 5),
+takže kontejner pro tuhle iteraci startuje jen `nakup`, ne celou denní
+skupinu — zbylé 4 profily běží dál na hostu nedotčené.
+
+`watchdog.sh` hostový `pgrep`/`nohup` blok pro `nakup` nahrazen
+kontejnerovou verzí (dvoukrokově: `docker compose ps` na kontejner samotný,
+pak `exec` pgrep na konkrétní proces uvnitř — zachytí i pád procesu, co
+`start-daily.sh`/`wait` sám nevyhodí). Iterace 4 výš popisovala tenhle
+mechanismus jen jako zakomentovaný/neaktivní pro celou skupinu; teď je
+aktivní v minutovém cronu, ale jen pro `nakup`. Dashboard (`personal/
+dashboard/src/config.ts`, pole `inContainer`) restart tlačítko pro `nakup`
+teď taky jde přes `docker compose exec ... pkill`, ne hostový `pkill` — jinak
+by proti kontejnerové PID namespace neměl na co sáhnout a tiše by no-opnul.
+
+Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) přejdou na
+stejný vzor až po vlastním schváleném cutoveru — samostatná budoucí iterace,
+viz `personal/devbot/TASKS.md`.
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním
