@@ -27,6 +27,23 @@ Stav po iteraci: `nakup` běží v kontejneru, čerstvý heartbeat, žádný
 schválený cutover — viz "Aktivace watchdog restartu kontejneru v cronu" níž,
 teď už částečně hotové (vzor pro `nakup` existuje a je ověřený naživo).
 
+### Cutover `assistant` do daily-bots kontejneru — VYŘEŠENO 7.10.
+
+Schváleno uživatelem (spec + checkpoint, 7.10.): `assistant` jako druhý denní
+profil (`DAILY_PROFILES=nakup assistant`), stejný vzor jako `nakup`. Po
+mergi (`worktree-docker-cutover-assistant-v2`) kill hostového `assistant`
+procesu (pid z 3.10.), `docker compose up -d` — kontejner recreated i přes
+cron `watchdog.sh` (detekoval `assistant` chybějící v novém compose stavu
+dřív, než jsem stihl rebuild spustit sám, viz `watchdog.log` 09:52:01 — žádný
+manuální restart běžícího procesu, konzistentní s konvencí). Ověřeno:
+heartbeat `personal/assistant/heartbeat_ts.txt` postupuje (09:52:49 →
+09:53:49), žádný `409 Conflict` v logu kontejneru, `nakup` v kontejneru
+nedotčený.
+
+Zbylé 3 denní profily (zpravodaj, mailista, joby) pořád na hostu — pořadí
+podle analytika z iterace 7: `joby`, `mailista`, naposled `zpravodaj`
+(historie OOM + webapp na portu 8766 mimo scope).
+
 ### Restart skripty startovaly nový proces sám (`nohup`), dědil env téhle session, ne crontabu — 2× OAuth výpadek 5.10. — VYŘEŠENO 5.10.
 
 Oprava self-killu (viz položka níž) pořád nechávala `restart_devbot.sh` i
