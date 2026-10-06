@@ -20,7 +20,7 @@ export interface BotDef {
 }
 
 export const BOTS: BotDef[] = [
-  { name: "assistant", dir: "/home/agent/agent-system/personal/assistant", killPattern: "tsx src/index.ts$", envFile: "/home/agent/agent-system/.env" },
+  { name: "assistant", dir: "/home/agent/agent-system/personal/assistant", killPattern: "tsx src/index.ts$", envFile: "/home/agent/agent-system/.env", inContainer: true },
   { name: "zpravodaj", dir: "/home/agent/agent-system/personal/zpravodaj", killPattern: "tsx src/index.ts zpravodaj", envFile: "/home/agent/agent-system/.env.zpravodaj" },
   { name: "mailista", dir: "/home/agent/agent-system/personal/mailista", killPattern: "tsx src/index.ts mailista", envFile: "/home/agent/agent-system/.env.mailista" },
   { name: "joby", dir: "/home/agent/agent-system/personal/joby", killPattern: "tsx src/index.ts joby", envFile: "/home/agent/agent-system/.env.joby" },
