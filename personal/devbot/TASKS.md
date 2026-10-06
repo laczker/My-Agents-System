@@ -559,3 +559,25 @@ zpravodaj/mailista/joby do `daily-bots`, `fbalbums` do `project-bots`,
 Otevřené: oba compose soubory sdílí project name `agent-system` → varování
 "orphan containers" (nepoužívat `--remove-orphans`; řešení `name:` v každém
 souboru); `trener` a `devbot` zůstávají na hostu (devbot nemůže restartovat sám sebe).
+
+### Rohlík MCP pro nakup — VYŘEŠENO 6.10.
+
+`personal/nakup/.mcp.json` (rohlik) + schválení v hostovém `~/.claude.json` +
+OAuth přihlášení na hostu (`su - agent`, `claude`, `/mcp`; callback přes `curl`
+na `localhost:<port>`). Kontejner `daily-bots` token uvidí až po
+`--force-recreate` (single-file mount drží starý inode). `claude mcp list` v
+kontejneru: `Connected`. Po vypršení tokenu zopakovat přihlášení na hostu +
+recreate `daily-bots`.
+
+### Iterace 9 — ověření SendMessage (rozpracováno 6.10.)
+
+`ListAgents` z hosta po restartu vidí kontejnerové session `nakup-6d`/`nakup-ec`
+→ směr host → kontejner registrován, test zprávy odeslán `nakup-ec`, ale DRŽEN (held, nepřečtený; jiný permission mode) — doručení neověřeno (do
+inboxu)). Zbývá: směr kontejner → host (já, `devbot-e0`) a kontejner → kontejner.
+
+Ověřeno 6.10.: kontejner → host (`nakup-d5` → `devbot-e1`) doručeno. Host → kontejner
+(`nakup-ec`) drženo kvůli permission módu druhé strany (session `interactive`, ne bypass),
+ne kvůli sdílení registru. Registr + sokety (`pid: host`, mounty) fungují.
+
+- [2026-10-06] Iteration 10 done: trener runs in daily-bots (6 bots). Lesson: `start-daily.sh` is COPYed into the image (Dockerfile.daily), so changes to it need `docker compose -f docker-compose.daily.yml up -d --build --force-recreate`, not just recreate.
+- Open: add trener to dashboard config.ts; consider mem_limit/restart limit for daily-bots.

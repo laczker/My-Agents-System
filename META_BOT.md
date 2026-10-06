@@ -458,3 +458,5 @@ Plný popis incidentů a jejich oprav (rate limit handling, race condition v
 ne náhrada. Novější `bridge-ts` změny (OAuth fallback, Telegram UX, rate-limit
 timeout fallback) se od založení `devbot` (7.9.) zapisují do
 `personal/devbot/DECISIONS.md` místo sem.
+
+> Note (iter. 10): `start-daily.sh` is baked into the daily image; after editing it run `up -d --build --force-recreate`.
