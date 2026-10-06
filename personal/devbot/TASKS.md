@@ -537,3 +537,15 @@ přepnutí, 2) zapojit watchdog kontrolu kontejneru do cronu, 3) zároveň
 odstranit/vypnout hostové `pgrep`/`nohup` bloky pro denní profily ve
 `watchdog.sh`, ať nehlídá oboje najednou. Samostatná budoucí iterace se
 svým specem, ne automatické zapnutí jako vedlejší efekt.
+
+### Obnova OAuth tokenu: restart kontejneru po `claude /login` (zjištěno 6.10.)
+
+Po vypršení OAuth tokenu nestačí přihlášení na hostu — `daily-bots` kontejner
+mountuje `~/.claude/credentials.json` bind-mountem a Claude CLI soubor zapisuje
+atomicky (nový inode), takže kontejner dál vidí starý, prošlý soubor.
+
+Postup při příštím vypršení: 1) `su - agent` (ne root!), `claude /login`,
+2) `docker compose restart daily-bots` (jen restart, ne rebuild/kill) — mount se
+obnoví, 3) ověřit `claude -p "ping"` uvnitř kontejneru. Bude se opakovat při
+každém refresh tokenu; kandidát na trvalé řešení: mountovat celý adresář
+`~/.claude/` místo jednoho souboru (samostatná iterace, vyžaduje spec).
