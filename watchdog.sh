@@ -31,6 +31,9 @@ cd /home/agent/agent-system/bridge-ts || exit 1
 #    každý profil zvlášť — zachytí i pád jen jednoho z nich, co kontejner
 #    (start-daily.sh/wait) sám nevyhodí. Container je sdílený, takže restart
 #    kvůli jednomu spadlému profilu restartuje i ten druhý (force-recreate).
+# Sdílený registr session (mounty v compose souborech): po rebootu /tmp zmizí a Docker by
+# chybějící adresář vytvořil jako root, takže kontejner (uid 1000) by do něj nezapsal.
+mkdir -p -m 700 /home/agent/.claude/sessions /tmp/cc-socks
 DAILY_PROFILES="assistant zpravodaj mailista joby nakup"
 compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
 if [ $? -ne 0 ]; then
