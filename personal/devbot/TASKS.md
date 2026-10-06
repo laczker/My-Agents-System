@@ -368,6 +368,19 @@ jen to má být v `TASKS.md` pro příští kolo, až se spec dořeší.
 
 ## Odloženo
 
+### Seznam kontejnerových profilů duplicitně na 3 místech (zjištěno 7.10., review iterace 7 — cutover `assistant`)
+
+Který denní profil běží v `daily-bots` kontejneru se dnes udržuje nezávisle
+na třech místech: `DAILY_PROFILES` v `docker-compose.daily.yml`, `for profile
+in nakup assistant` smyčka ve `watchdog.sh`, a `inContainer: true` flag u
+každého bota v `personal/dashboard/src/config.ts`. Zapomenutí jednoho z nich
+při příštím cutoveru (zpravodaj/mailista/joby) je tichá chyba — např. profil
+by běžel v kontejneru, ale watchdog by ho nehlídal, nebo dashboard restart
+tlačítko by no-opnulo proti hostu. Zatím to review při každé iteraci odchytává
+(viz iterace 6 i 7), ale architektonicky čistší je jeden zdroj pravdy (např.
+watchdog.sh/dashboard čtou `DAILY_PROFILES` ze stejné proměnné/souboru místo
+vlastní kopie seznamu) — samostatná budoucí iterace, ne blokující tuhle.
+
 ### `chat_history.txt` roste bez rotace, teď i rychleji (zjištěno 21.9., review iterace "zápis unsolicited textu do historie")
 
 Iterace přidala do `handleUnsolicitedLine` druhý, častější zdroj zápisu do
