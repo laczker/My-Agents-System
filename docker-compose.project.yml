@@ -13,6 +13,10 @@ services:
     # uživatelem (agent, uid/gid 1000), jinak soubory zapsané do bind-mountů
     # (heartbeat, session, fronta, i vlastní commit uvnitř produktového repa)
     # skončí na hostu vlastněné rootem.
+    # Sdílený registr session pro ListAgents/SendMessage mezi hostem a kontejnery
+    # (iterace 9). `pid: host` je nutné, aby si procesy ověřily `pidDomain` v
+    # záznamu session; adresářové rw mounty (ne jednotlivé soubory — inode problém).
+    pid: host
     user: "1000:1000"
     environment:
       - HOME=/home/agent
@@ -34,4 +38,6 @@ services:
       # interaktivní shell).
       - /home/agent/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
       - /home/agent/.claude.json:/home/agent/.claude.json:ro
+      - /home/agent/.claude/sessions:/home/agent/.claude/sessions
+      - /tmp/cc-socks:/tmp/cc-socks
     restart: "no"

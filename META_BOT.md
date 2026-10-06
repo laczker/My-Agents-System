@@ -426,6 +426,14 @@ dostal `procps`. Na hostu zůstávají `devbot`, `trener`, dashboard a zpravodaj
 (port 8766) a cron skripty (`daily_digest.sh`, `ai_news_digest.sh`, `daily_job_search.sh`,
 `nightly_cleanup.sh`) — ty běží mimo bridge-ts.
 
+**Iterace 9 (6.10.) — viditelnost session napříč hostem a kontejnery:** `ListAgents`/
+`SendMessage` hledají živé session v `~/.claude/sessions/<pid>.json` (s `pidDomain`)
+a socket každé session v `/tmp/cc-socks`. Kontejnery to dřív nesdílely, takže se boti
+v kontejneru nevídali ani mezi sebou ani s hostem (`devbot`). Oba compose soubory proto
+mají `pid: host` a rw adresářové mounty `~/.claude/sessions` a `/tmp/cc-socks`. Ověřeno
+jednorázovým kontejnerem ve `stream-json` režimu (`claude -p "text"` se do registru
+nezapisuje); dosud jen směr host → kontejner.
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním
