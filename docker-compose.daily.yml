@@ -3,12 +3,12 @@
 # běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
 # migraci živého provozu řeší až budoucí iterace.
 #
-# Iterace 6 (canary cutover, 5.10.): DAILY_PROFILES omezuje start jen na
-# `nakup` — jediný denní profil bez vlastního cron skriptu na hostu, tedy
-# nejnižší riziko kolize stavových souborů. Zbylé 4 profily (assistant,
-# zpravodaj, mailista, joby) pořád běží jen na hostu, dokud se jejich cutover
-# neschválí zvlášť. Až k tomu dojde, řádek s DAILY_PROFILES stačí smazat
-# (start-daily.sh defaultuje zpět na všech 5).
+# Iterace 6 (canary cutover nakup, 5.10.): DAILY_PROFILES omezuje start jen
+# na profily, co už mají schválený cutover. Iterace 7 (7.10.) přidává
+# `assistant` — bez vlastního cron skriptu na hostu, stejně nízké riziko jako
+# nakup. Zbylé 3 profily (zpravodaj, mailista, joby) pořád běží jen na hostu,
+# dokud se jejich cutover neschválí zvlášť. Až budou všechny, řádek s
+# DAILY_PROFILES stačí smazat (start-daily.sh defaultuje zpět na všech 5).
 services:
   daily-bots:
     build:
@@ -22,7 +22,7 @@ services:
     user: "1000:1000"
     environment:
       - HOME=/home/agent
-      - DAILY_PROFILES=nakup
+      - DAILY_PROFILES=nakup assistant
     volumes:
       - ./.env:/home/agent/agent-system/.env:ro
       - ./.env.zpravodaj:/home/agent/agent-system/.env.zpravodaj:ro

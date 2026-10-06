@@ -19,12 +19,6 @@ record_restart() {
 
 cd /home/agent/agent-system/bridge-ts || exit 1
 
-if ! pgrep -f "tsx src/index.ts$" > /dev/null; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (assistant) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
-    nohup npx tsx src/index.ts >> /home/agent/agent-system/bridge_ts.log 2>&1 &
-    record_restart "assistant" "proces neběžel"
-fi
-
 if ! pgrep -f "tsx src/index.ts zpravodaj" > /dev/null; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (zpravodaj) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
     nohup npx tsx src/index.ts zpravodaj >> /home/agent/agent-system/bridge_ts_zpravodaj.log 2>&1 &
@@ -43,16 +37,20 @@ if ! pgrep -f "tsx src/index.ts joby" > /dev/null; then
     record_restart "joby" "proces neběžel"
 fi
 
-# nakup iterace 6 (canary cutover, 5.10.) běží v daily-bots kontejneru místo
-# na hostu. Dvoukrokové hlídání (ne jen pgrep uvnitř kontejneru přímo):
+# nakup (iterace 6, 5.10.) a assistant (iterace 7, 7.10.) běží v daily-bots
+# kontejneru místo na hostu — musí sedět s DAILY_PROFILES v
+# docker-compose.daily.yml. Dvoukrokové hlídání (ne jen pgrep uvnitř
+# kontejneru přímo):
 # 1) `docker compose ps` — pokud selže (daemon nedostupný), jen zalogovat a
-#    nic nerestartovat, ať se netváří, že nakup spadl, když problém je jinde
+#    nic nerestartovat, ať se netváří, že profil spadl, když problém je jinde
 #    (stejná opatrnost jako u iterace 4, viz META_BOT.md §4a); pokud kontejner
 #    neběží, normální `up -d`.
-# 2) teprve když kontejner běží, `exec` pgrep na konkrétní proces uvnitř —
-#    zachytí i pád procesu, co kontejner (start-daily.sh/wait) sám nevyhodí.
-# Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) pořád běží na
-# hostu beze změny.
+# 2) teprve když kontejner běží, `exec` pgrep na konkrétní proces uvnitř za
+#    každý profil zvlášť — zachytí i pád jen jednoho z nich, co kontejner
+#    (start-daily.sh/wait) sám nevyhodí. Container je sdílený, takže restart
+#    kvůli jednomu spadlému profilu restartuje i ten druhý (force-recreate).
+# Zbylé 3 denní profily (zpravodaj, mailista, joby) pořád běží na hostu
+# beze změny.
 compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
 if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
@@ -60,10 +58,26 @@ elif ! echo "$compose_ps_output" | grep -q "^daily-bots$"; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') daily-bots kontejner neběží, restartuji" >> /home/agent/agent-system/watchdog.log
     (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d) >> /home/agent/agent-system/watchdog.log 2>&1
     record_restart "nakup" "kontejner neběžel"
-elif ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml exec -T daily-bots pgrep -f "tsx src/index.ts nakup" > /dev/null 2>&1; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (nakup, kontejner) proces neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
-    (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d --force-recreate) >> /home/agent/agent-system/watchdog.log 2>&1
-    record_restart "nakup" "proces v kontejneru neběžel"
+    record_restart "assistant" "kontejner neběžel"
+else
+    down_profiles=""
+    for profile in nakup assistant; do
+        if [ "$profile" = "assistant" ]; then
+            pattern="tsx src/index.ts$"
+        else
+            pattern="tsx src/index.ts $profile"
+        fi
+        if ! docker compose -f /home/agent/agent-system/docker-compose.daily.yml exec -T daily-bots pgrep -f "$pattern" > /dev/null 2>&1; then
+            down_profiles="$down_profiles $profile"
+        fi
+    done
+    if [ -n "$down_profiles" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (kontejner,$down_profiles) proces neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
+        (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d --force-recreate) >> /home/agent/agent-system/watchdog.log 2>&1
+        for profile in $down_profiles; do
+            record_restart "$profile" "proces v kontejneru neběžel"
+        done
+    fi
 fi
 
 if ! pgrep -f "tsx src/index.ts fbalbums" > /dev/null; then
@@ -94,7 +108,8 @@ if ! pgrep -f "tsx.*/personal/zpravodaj/webapp/server/src/index.ts$" > /dev/null
     (cd /home/agent/agent-system/personal/zpravodaj/webapp/server && nohup npx tsx /home/agent/agent-system/personal/zpravodaj/webapp/server/src/index.ts >> /home/agent/agent-system/zpravodaj_webapp.log 2>&1 &)
 fi
 
-# Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) přejdou na
-# stejný kontejnerový pattern jako nakup výš až po jejich vlastním schváleném
-# cutoveru — samostatná budoucí iterace, ne vedlejší efekt týhle (viz
-# personal/devbot/TASKS.md, "Aktivace watchdog restartu kontejneru v cronu").
+# Zbylé 3 denní profily (zpravodaj, mailista, joby) přejdou na stejný
+# kontejnerový pattern jako nakup/assistant výš až po jejich vlastním
+# schváleném cutoveru — samostatná budoucí iterace, ne vedlejší efekt týhle
+# (viz personal/devbot/TASKS.md, "Aktivace watchdog restartu kontejneru v
+# cronu").

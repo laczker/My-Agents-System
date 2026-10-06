@@ -406,9 +406,19 @@ dashboard/src/config.ts`, pole `inContainer`) restart tlačítko pro `nakup`
 teď taky jde přes `docker compose exec ... pkill`, ne hostový `pkill` — jinak
 by proti kontejnerové PID namespace neměl na co sáhnout a tiše by no-opnul.
 
-Zbylé 4 denní profily (assistant, zpravodaj, mailista, joby) přejdou na
-stejný vzor až po vlastním schváleném cutoveru — samostatná budoucí iterace,
-viz `personal/devbot/TASKS.md`.
+Iterace 7 (cutover `assistant`, 7.10.): stejný vzor jako iterace 6, druhý
+profil. `assistant` zvolen jako další, protože je — stejně jako `nakup` —
+bez vlastního samostatného cron skriptu na hostu. `DAILY_PROFILES` teď
+`nakup assistant`, `watchdog.sh` kontejnerová kontrola generalizovaná na oba
+profily (force-recreate kontejneru, pokud kterýkoliv z nich uvnitř neběží;
+hostový `pgrep`/`nohup` blok pro `assistant` smazán). Dashboard config dostal
+`inContainer: true` i pro `assistant` ze stejného důvodu jako u `nakup`
+(iterace 6) — jinak by restart tlačítko tiše no-opnulo proti prázdné hostové
+PID namespace.
+
+Zbylé 3 denní profily (zpravodaj, mailista, joby) přejdou na stejný vzor až
+po vlastním schváleném cutoveru — samostatná budoucí iterace, viz
+`personal/devbot/TASKS.md`.
 
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
