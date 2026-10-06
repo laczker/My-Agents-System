@@ -19,6 +19,10 @@ services:
     # session, fronta...), skončí na hostu vlastněné rootem a host uživatel k nim
     # ztratí přístup (zjištěno code review, iterace 1). Container `claude` CLI hledá
     # auth podle $HOME, proto musí sedět i s cestou mountů níž.
+    # Sdílený registr session pro ListAgents/SendMessage mezi hostem a kontejnery
+    # (iterace 9). `pid: host` je nutné, aby si procesy ověřily `pidDomain` v
+    # záznamu session; adresářové rw mounty (ne jednotlivé soubory — inode problém).
+    pid: host
     user: "1000:1000"
     environment:
       - HOME=/home/agent
@@ -47,4 +51,6 @@ services:
       # nebo vytvořil prázdný adresář (zjištěno code review).
       - /home/agent/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
       - /home/agent/.claude.json:/home/agent/.claude.json:ro
+      - /home/agent/.claude/sessions:/home/agent/.claude/sessions
+      - /tmp/cc-socks:/tmp/cc-socks
     restart: "no"
