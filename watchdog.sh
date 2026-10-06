@@ -19,7 +19,7 @@ record_restart() {
 
 cd /home/agent/agent-system/bridge-ts || exit 1
 
-# Všech 5 denních profilů (nakup iter. 6, assistant iter. 7, zpravodaj/mailista/joby iter. 8, 6.10.) běží v daily-bots
+# Všech 6 denních profilů (nakup iter. 6, assistant iter. 7, zpravodaj/mailista/joby iter. 8, trener iter. 10) běží v daily-bots
 # kontejneru místo na hostu — musí sedět s DAILY_PROFILES v
 # docker-compose.daily.yml. Dvoukrokové hlídání (ne jen pgrep uvnitř
 # kontejneru přímo):
@@ -34,7 +34,7 @@ cd /home/agent/agent-system/bridge-ts || exit 1
 # Sdílený registr session (mounty v compose souborech): po rebootu /tmp zmizí a Docker by
 # chybějící adresář vytvořil jako root, takže kontejner (uid 1000) by do něj nezapsal.
 mkdir -p -m 700 /home/agent/.claude/sessions /tmp/cc-socks
-DAILY_PROFILES="assistant zpravodaj mailista joby nakup"
+DAILY_PROFILES="assistant zpravodaj mailista joby nakup trener"
 compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
 if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
@@ -85,12 +85,6 @@ if ! pgrep -f "tsx src/index.ts devbot" > /dev/null; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (devbot) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
     nohup npx tsx src/index.ts devbot >> /home/agent/agent-system/bridge_ts_devbot.log 2>&1 &
     record_restart "devbot" "proces neběžel"
-fi
-
-if ! pgrep -f "tsx src/index.ts trener" > /dev/null; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (trener) neběží, restartuji" >> /home/agent/agent-system/watchdog.log
-    nohup npx tsx src/index.ts trener >> /home/agent/agent-system/bridge_ts_trener.log 2>&1 &
-    record_restart "trener" "proces neběžel"
 fi
 
 if ! pgrep -f "tsx.*personal/dashboard/src/index.ts" > /dev/null; then
