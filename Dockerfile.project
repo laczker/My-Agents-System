@@ -4,11 +4,13 @@
 # skupiny (.env.<profil> cesty v bridge-ts/src/config.ts).
 FROM node:20-slim
 
+# `procps` (pgrep/pkill) — watchdog.sh a dashboard restart tlačítko se do kontejneru
+# `exec`ují (stejný důvod jako Dockerfile.daily, iterace 8).
 # `git` navíc oproti Dockerfile.daily — fbalbums si otevírá `git worktree`
 # přes EnterWorktree/ExitWorktree nad vlastním produktovým repem
 # (/home/agent/fbalbums) pro svůj vývojový cyklus; bez něj by worktree
 # krok v kontejneru hned selhal na "git: command not found".
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+RUN apt-get update && apt-get install -y --no-install-recommends git procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Verze pinutá shodně s Dockerfile.daily (claude --version v době psaní) —

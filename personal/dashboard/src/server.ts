@@ -259,8 +259,8 @@ export function startServer(): void {
       try {
         if (bot.inContainer) {
           execFileSync("docker", [
-            "compose", "-f", "/home/agent/agent-system/docker-compose.daily.yml",
-            "exec", "-T", "daily-bots", "pkill", "-TERM", "-f", bot.killPattern,
+            "compose", "-f", `/home/agent/agent-system/docker-compose.${bot.inContainer === "project-bots" ? "project" : "daily"}.yml`,
+            "exec", "-T", bot.inContainer, "pkill", "-TERM", "-f", bot.killPattern,
           ]);
         } else {
           execFileSync("pkill", ["-TERM", "-f", bot.killPattern]);

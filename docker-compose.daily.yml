@@ -22,7 +22,6 @@ services:
     user: "1000:1000"
     environment:
       - HOME=/home/agent
-      - DAILY_PROFILES=nakup assistant
     volumes:
       - ./.env:/home/agent/agent-system/.env:ro
       - ./.env.zpravodaj:/home/agent/agent-system/.env.zpravodaj:ro

@@ -416,9 +416,15 @@ hostový `pgrep`/`nohup` blok pro `assistant` smazán). Dashboard config dostal
 (iterace 6) — jinak by restart tlačítko tiše no-opnulo proti prázdné hostové
 PID namespace.
 
-Zbylé 3 denní profily (zpravodaj, mailista, joby) přejdou na stejný vzor až
-po vlastním schváleném cutoveru — samostatná budoucí iterace, viz
-`personal/devbot/TASKS.md`.
+**Iterace 8 (6.10.) — dokončení převodu:** zpravodaj, mailista a joby přešly do
+`daily-bots` (`DAILY_PROFILES` smazáno, všech 5 profilů v kontejneru) a `fbalbums`
+do `project-bots` (`docker-compose.project.yml`). `watchdog.sh` hlídá oba
+kontejnery dvoukrokově (`compose ps` + `exec pgrep`), hostové `pgrep`/`nohup` bloky
+pro tyhle profily jsou pryč; `inContainer` v dashboardu je teď `"daily-bots"` /
+`"project-bots"` a restart tlačítko míří na správný compose soubor. `Dockerfile.project`
+dostal `procps`. Na hostu zůstávají `devbot`, `trener`, dashboard a zpravodaj webapp
+(port 8766) a cron skripty (`daily_digest.sh`, `ai_news_digest.sh`, `daily_job_search.sh`,
+`nightly_cleanup.sh`) — ty běží mimo bridge-ts.
 
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 

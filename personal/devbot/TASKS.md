@@ -549,3 +549,13 @@ Postup při příštím vypršení: 1) `su - agent` (ne root!), `claude /login`,
 obnoví, 3) ověřit `claude -p "ping"` uvnitř kontejneru. Bude se opakovat při
 každém refresh tokenu; kandidát na trvalé řešení: mountovat celý adresář
 `~/.claude/` místo jednoho souboru (samostatná iterace, vyžaduje spec).
+
+### Dokončený převod na Docker — VYŘEŠENO 6.10. (iterace 8)
+
+Na přímou žádost uživatele provedeno najednou, bez samostatného specu/checkpointu:
+zpravodaj/mailista/joby do `daily-bots`, `fbalbums` do `project-bots`,
+`watchdog.sh` + dashboard přepnuté. Ověřeno: heartbeaty všech 6 profilů čerstvé,
+žádný 409/EACCES v logu obou kontejnerů. `/code-review` neproběhl.
+Otevřené: oba compose soubory sdílí project name `agent-system` → varování
+"orphan containers" (nepoužívat `--remove-orphans`; řešení `name:` v každém
+souboru); `trener` a `devbot` zůstávají na hostu (devbot nemůže restartovat sám sebe).
