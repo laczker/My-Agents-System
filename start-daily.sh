@@ -4,10 +4,7 @@
 # personal/devbot/CLAUDE.md). "assistant" is the profile with no argument
 # (backward compatibility, see config.ts).
 # Which profiles start is controlled by $DAILY_PROFILES (space-separated),
-# defaulting to all 6 — iteration 6 (nakup canary cutover) overrides it in
-# docker-compose.daily.yml to start only "nakup", so the container doesn't
-# also take over assistant/zpravodaj/mailista/joby while their host processes
-# are still the live ones.
+# defaulting to all 6 (docker-compose.daily.yml does not override it).
 # SIGTERM/SIGINT is forwarded to all children, so `docker compose stop`/`down`
 # terminates the subprocesses cleanly instead of leaving orphaned `claude`
 # subprocesses.

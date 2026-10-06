@@ -1,14 +1,10 @@
-# Docker pilot, iterace 1+2+3 (personal/devbot/CLAUDE.md) — skupina denních botů
-# (assistant, zpravodaj, mailista, joby, nakup, trener) v jednom kontejneru vedle toho, co
-# běží na hostu. Záměrně BEZ napojení na watchdog.sh/crontab a bez `restart` policy —
-# migraci živého provozu řeší až budoucí iterace.
-#
-# Iterace 6 (canary cutover nakup, 5.10.): DAILY_PROFILES omezuje start jen
-# na profily, co už mají schválený cutover. Iterace 7 (7.10.) přidává
-# `assistant` — bez vlastního cron skriptu na hostu, stejně nízké riziko jako
-# nakup. Zbylé 3 profily (zpravodaj, mailista, joby) pořád běží jen na hostu,
-# dokud se jejich cutover neschválí zvlášť. Až budou všechny, řádek s
-# DAILY_PROFILES stačí smazat (start-daily.sh defaultuje zpět na všech 5).
+# Docker pilot (personal/devbot/CLAUDE.md) — skupina denních botů (assistant,
+# zpravodaj, mailista, joby, nakup, trener) v jednom kontejneru. Kontejner hlídá
+# watchdog.sh (compose ps + exec pgrep, viz META_BOT.md §4a). Všech 6 profilů běží
+# v kontejneru (iterace 6-8 a 10); start-daily.sh defaultuje na všech 6, takže
+# DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
+# watchdogu i hostové procesy, takže hostový proces stejného profilu musí být
+# před cutoverem zastavený.
 services:
   daily-bots:
     build:
