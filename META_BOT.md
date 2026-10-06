@@ -422,7 +422,7 @@ do `project-bots` (`docker-compose.project.yml`). `watchdog.sh` hlídá oba
 kontejnery dvoukrokově (`compose ps` + `exec pgrep`), hostové `pgrep`/`nohup` bloky
 pro tyhle profily jsou pryč; `inContainer` v dashboardu je teď `"daily-bots"` /
 `"project-bots"` a restart tlačítko míří na správný compose soubor. `Dockerfile.project`
-dostal `procps`. Na hostu zůstávají `devbot`, `trener`, dashboard a zpravodaj webapp
+dostal `procps`. Na hostu zůstávají `devbot`, dashboard a zpravodaj webapp
 (port 8766) a cron skripty (`daily_digest.sh`, `ai_news_digest.sh`, `daily_job_search.sh`,
 `nightly_cleanup.sh`) — ty běží mimo bridge-ts.
 
@@ -433,6 +433,13 @@ v kontejneru nevídali ani mezi sebou ani s hostem (`devbot`). Oba compose soubo
 mají `pid: host` a rw adresářové mounty `~/.claude/sessions` a `/tmp/cc-socks`. Ověřeno
 jednorázovým kontejnerem ve `stream-json` režimu (`claude -p "text"` se do registru
 nezapisuje); dosud jen směr host → kontejner.
+
+**Iterace 10 — `trener` do `daily-bots`:** `trener` přešel z hostu do `daily-bots`
+(6 profilů). Compose mountuje `.env.trener` (ro) a `personal/trener`, `start-daily.sh`
+a `DAILY_PROFILES` ve `watchdog.sh` obsahují `trener`, hostový `pgrep`/`nohup` blok je
+smazán (jinak by vznikly dva pollery na jednom tokenu, 409). `checkin.sh` (cron
+13:00/23:00) zůstává na hostu. Pád jen `trener` restartuje celý `daily-bots` (stejně
+jako u ostatních profilů). Dashboard `trener` zatím nezobrazuje (není v `BOTS`).
 
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
