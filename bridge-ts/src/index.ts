@@ -232,8 +232,11 @@ bot.on("message", async (ctx) => {
   // text if the reaction fails. A queued message keeps its text, which carries the
   // queue position.
   if (wasIdle) {
+    const job = jobQueue[jobQueue.length - 1];
     void reactTo(bot.api, chatId, msg.message_id).then((ok) => {
-      if (!ok) sendMsg(`⏳ Zpracovávám...`, chatId, msg.message_id);
+      // Skip the fallback once the job has already been picked up, so a stale
+      // "processing" text can't land below the result.
+      if (!ok && jobQueue.includes(job)) sendMsg(`⏳ Zpracovávám...`, chatId, msg.message_id);
     });
   } else {
     sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId, msg.message_id);
