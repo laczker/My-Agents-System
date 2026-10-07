@@ -5,18 +5,11 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
 
 ## Otevřené (podle priority)
 
-1. **`~/.claude.json` je pořád single-file mount (inode)** — oba compose soubory
-   mountují `/home/agent/.claude.json:ro` jako soubor; po přepsání na hostu
-   (tmp+rename) kontejner vidí starý obsah. Řešení: adresářový mount /
-   `CLAUDE_CONFIG_DIR`. Dotýká se auth. Velikost: M. Nasazení = recreate.
-2. **Restart skripty / watchdog** — dávkování startu botů ve `watchdog.sh` (po
-   zapnutí cronu nahodí všechny najednou = paměťová špička, možná příčina pádu
-   1.10.); starý vzor `src/index\.ts$` pro `assistant` v
-   `restart_remaining_profiles.sh` zasáhne i dashboard a webapp zpravodaje.
-   Velikost: S.
+1. **`~/.claude.json` single-file mount (inode)** — vyřešeno jen jako ruční `--force-recreate` po změně na hostu. Adresářový mount ani `CLAUDE_CONFIG_DIR` nejdou (`.env` a klíče v `$HOME`, rozbité resume session); větev batchD-claude-json zamítnuta.
+2. **Restart skripty / watchdog** — hotovo (`57ad2e2`). Volitelně: postupný start profilů uvnitř `start-daily.sh` (vyžaduje rebuild image).
 3. **Adresářový mount pro `META_BOT.md`/`ARCHITEKTURA.md`** — dnes jen `:ro`
    single-file mount, kontejnerový assistant je nemůže upravovat. Přesun do
-   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. **Hotovo (branch batchF-docs-mount, čeká na merge + recreate kontejnerů).**
+   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. **Hotovo (`708fed0`, nasazeno).**
 4. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
    netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M.
 5. **Drobnosti** — ověření SendMessage kontejner → kontejner (iterace 9);
