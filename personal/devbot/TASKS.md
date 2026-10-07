@@ -22,8 +22,10 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    Velikost: M. **Hotovo (iterace 13, `auth_watch.sh`, viz `META_BOT.md`).**
 8. **Telegram UX, druhá vlna** — `reply_parameters`, `setMessageReaction`,
    `editMessageText`. Sdílený kód všech botů. Velikost: M.
-9. **Přesun devbota do kontejneru** — nemůže restartovat sám sebe, pracuje nad
-   repem + worktrees + docker socketem. Potřeba spec. Velikost: L.
+9. **Přesun devbota do kontejneru** — **zamítnuto 7.10.** Devbot musí zůstat na
+   hostu s plným přístupem (nezávislá pojistka při problémech kontejnerů/cronu);
+   alternativy (docker socket, žádosti přes soubor) jsou buď bezpečnostní riziko,
+   nebo omezení. Viz `DECISIONS.md`. Sebe-restart řeší č. 6.
 10. **Sjednotit chování agentů / jazyk a frekvence mezikroků** — uživatel
     5.10. řekl "teď neřešit"; čeká na pokyn. Velikost: M–L.
 11. **`unescapeDelimiter` a zero-width space** — nízká priorita, řešit až se

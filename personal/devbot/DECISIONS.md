@@ -392,3 +392,16 @@ The existing count-only cap could rewrite on every append for huge exchanges; th
 bound fixes that. Tests: `bridge-ts/src/history.test.ts`.
 
 **Date:** 2026-10-07
+
+## Devbot stays on the host (task 9 rejected)
+
+**Decision:** devbot is not moved into a container. It stays a host process with full
+access to the repo, crontab and docker.
+
+**Why:** it is the independent fixer when containers, compose or cron break (it already
+saved us during cron incidents). Inside a container it would need the docker socket
+(effectively root on the host) or a request-file mechanism served by a host script
+(every new capability would need the host script extended). Both are worse than the
+status quo. The only real gain, clean self-restart, is handled separately (task 6).
+
+**Date:** 2026-10-07
