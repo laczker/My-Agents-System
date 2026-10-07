@@ -267,6 +267,10 @@ Pravidlo pro volbu při zakládání bota:
    `CronCreate` zůstává v pořádku jen pro krátkodobé probouzení uvnitř JEDNOHO
    aktivního běhu, co se odehraje a skončí v řádu hodin (mailista, noční dávková
    smyčka, viz §1) — ne pro cokoliv, co má přežít přes den/restart.
+6. **Kontrola konvencí:** `./check_bot_conventions.sh` (read-only, v kořeni repa)
+   ověří, že každý `personal/*/CLAUDE.md` obsahuje sekci `## Jazyk` (česky) a pravidlo
+   `[TICHO]` (jen úvodní a finální zpráva u cross-session tahů; `bridge-ts` samo pošle
+   živě jen první a poslední blok). Spusť po založení nového bota nebo úpravě `CLAUDE.md`.
 
 ## 4. Sdílené vs. izolované zdroje mezi boty
 

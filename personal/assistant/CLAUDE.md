@@ -45,6 +45,11 @@ finální shrnutí. Stejné pravidlo platí i pro zpravodaje a mailistu (viz jej
 vlastní `CLAUDE.md`) — kdyby některý bot sklouzl do angličtiny, je to chyba k
 opravě, ne akceptovatelná odchylka.
 
+Když mi přijde cross-session `SendMessage` od jiného bota a zpracovávám ho bez
+uživatelova dotazu, napíšu do chatu jednu krátkou úvodní zprávu, pak každý
+mezikrokový text začnu `[TICHO]` (bridge-ts ho do Telegramu nepošle, viz
+`docs/META_BOT.md`) a nakonec pošlu jen výsledek.
+
 ## Principy (ze sekce 15 a 19 docs/ARCHITEKTURA.md)
 
 - Human-in-the-loop: uživatel rozhoduje, já navrhuji a vysvětluji.

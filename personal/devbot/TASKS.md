@@ -36,8 +36,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    hostu s plným přístupem (nezávislá pojistka při problémech kontejnerů/cronu);
    alternativy (docker socket, žádosti přes soubor) jsou buď bezpečnostní riziko,
    nebo omezení. Viz `DECISIONS.md`. Sebe-restart řeší č. 6.
-10. **Sjednotit chování agentů / jazyk a frekvence mezikroků** — uživatel
-    5.10. řekl "teď neřešit"; čeká na pokyn. Velikost: M–L.
+10. ~~**Sjednotit chování agentů / jazyk a frekvence mezikroků**~~ — HOTOVO: bridge-ts už posílá jen první a poslední blok unsolicited tahu (+ `[TICHO]`); `check_bot_conventions.sh` ověřuje, že každý `personal/*/CLAUDE.md` má sekci `## Jazyk` a pravidlo `[TICHO]`; assistantovi chybělo `[TICHO]`, doplněno. Bez změny kódu bridge-ts.
 11. ~~**`unescapeDelimiter` a zero-width space**~~ — HOTOVO: escape je teď
     bijektivní (přidá/odebere jedno ZWSP před `\n`), takže původní ZWSP v textu
     přežije round-trip; změna formátu na JSON-lines nebyla potřeba.
