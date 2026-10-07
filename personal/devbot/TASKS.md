@@ -11,7 +11,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    single-file mount, kontejnerový assistant je nemůže upravovat. Přesun do
    adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. **Hotovo (`708fed0`, nasazeno).**
 4. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
-   netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M. **Hotovo (větev `devbot/history-rotation`, čeká na merge a nasazení).**
+   netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M. **Hotovo (merge `9f54281`, nasazeno).**
 5. **Drobnosti** — ověření SendMessage kontejner → kontejner (iterace 9);
    postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
    na hostu); po každém worktree ověřit `git merge-base HEAD main`.
@@ -30,7 +30,8 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
     změnou formátu na JSON-lines.
 12. **Bezpečnost: `crontab_backup.txt`** — hotovo: vyřazen z gitu a v `.gitignore`
     (skripty ho generují z `crontab -l`). Token zůstává v historii prvního commitu;
-    pokud repo někdy půjde na vzdálený server, token rotovat.
+    repo na GitHubu je soukromé (potvrzeno 7.10.). **TODO uživatel (později):** token
+    rotovat (`claude setup-token`) a nový vložit do crontabu, `.env` a kontejnerů.
 13. **Připomínka: ověřit/obnovit `CLAUDE_CODE_OAUTH_TOKEN` kolem 15.9.2027.**
 
 ## Hotové (jeden řádek na položku)
