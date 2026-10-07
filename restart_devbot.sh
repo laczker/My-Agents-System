@@ -84,7 +84,7 @@ if [ -z "${RESTART_DEVBOT_DETACHED:-}" ]; then
     send_alert "⚠️ restart_devbot.sh: chybí příkaz setsid, restart devbota jsem bezpečně odmítl spustit (cron watchdog zůstal beze změny)."
     exit 1
   fi
-  RESTART_DEVBOT_DETACHED=1 setsid "$0" "$@" < /dev/null >> "$LOG" 2>&1 &
+  RESTART_DEVBOT_DETACHED=1 setsid "$(readlink -f "$0")" "$@" < /dev/null >> "$LOG" 2>&1 &
   disown
   exit 0
 fi
@@ -127,7 +127,8 @@ mv "${CRON_BACKUP}.new" "$CRON_BACKUP"
 crontab -l | grep -v "watchdog.sh" | crontab -
 log "cron watchdog disabled"
 
-PGREP_PATTERN="src/index\.ts devbot"
+# Anchored with $ so a longer cmdline (e.g. "... devbot-foo") cannot match.
+PGREP_PATTERN='src/index\.ts devbot$'
 OLD_CHAIN_PIDS=$(pgrep -f "$PGREP_PATTERN" | tr '\n' ' ')
 if [ -n "$OLD_CHAIN_PIDS" ]; then
   CLAUDE_PID=$(ps -eo pid,ppid,cmd | awk -v pids="$OLD_CHAIN_PIDS" '
