@@ -212,3 +212,34 @@ jen s `handleUnsolicitedLine`.
   opraví.
 
 **Date:** 2026-09-30
+
+## Vyšší autonomie: úkoly z TASKS.md bez dalšího specu, dávky přes víc subagentů, jeden checkpoint (7.10.)
+
+**Rozhodnutí:** Úkol zapsaný v `TASKS.md` se bere jako schválený spec. Víc
+úkolů se dělá paralelně přes subagenty ve vlastních worktrees a do `main` jdou
+v jednom konsolidovaném checkpointu. Schválení zůstává jen pro restarty,
+crontab, mazání a bezpečnostní nastavení, a sbírá se najednou.
+
+**Why:** Uživatel schvaluje skoro všechno a opakovaně řekl, že dílčí dotazy
+jsou zbytečné ("už po miliontý"). Zapsáno do `CLAUDE.md` (sekce Autonomie) a
+do paměti, aby se to přestalo ignorovat.
+
+**Date:** 2026-10-07
+
+## Docker pilot: dvě skupiny kontejnerů, `~/.claude` jako ro adresářový mount (iterace 6–11, shrnutí 7.10.)
+
+**Rozhodnutí:** Místo kontejneru na bota běží `daily-bots` (assistant, zpravodaj,
+mailista, joby, nakup, trener) a `project-bots` (fbalbums). Cutover po jednom
+profilu (nakup → assistant → zbytek), `watchdog.sh` hlídá kontejner přes
+`compose ps` + `exec pgrep`, `pid: host` + mounty `sessions`/`cc-socks` kvůli
+`ListAgents`/`SendMessage`. Od iterace 11 je `~/.claude` mountovaný jako celý
+adresář read-only (kontejnery token nerefreshují, vidí vždy aktuální soubor).
+Devbot zůstává na hostu (nemůže restartovat sám sebe).
+
+**Why:** OOM izolace a rychlý restart při těsné paměti (6 kontejnerů by byl
+moc overhead). Single-file bind mount drží starý inode po tmp+rename (zjištěno u
+`.credentials.json`, `META_BOT.md`, `.claude.json`) — proto adresářové mounty.
+`Dockerfile.daily` bez `procps` způsobil force-recreate každou minutu (iterace 6).
+Otevřené následky viz `TASKS.md` (`.claude.json`, mem_limit, orphan, dashboard).
+
+**Date:** 2026-10-07

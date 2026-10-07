@@ -79,6 +79,24 @@ běžící proces jiného bota, měnil systémový crontab, nebo dočasně shodi
 produkční provoz, jde vždy přes explicitní schválení v checkpointu (krok 4) —
 nikdy jako vedlejší efekt bez zmínky.
 
+## Autonomie — trvalé pravidlo od uživatele (7.10., opakovaně zdůrazněno)
+
+Uživatel mi to řekl už mnohokrát a já to ignoroval, proto je to tady natvrdo:
+
+- **Úkol, který je už zapsaný v `TASKS.md` (nebo ho uživatel schválil), má
+  schválený spec.** Neposílej k němu další spec ke schválení, rovnou ho dělej.
+- **Dělej po větších částech.** Víc úkolů z `TASKS.md` najednou, paralelně přes
+  víc subagentů (každý ve vlastním worktree). Pořadí, rozdělení do dávek a
+  drobné technické volby rozhoduju sám, jen je stručně oznámím.
+- **Jediná brána je konsolidovaný checkpoint před mergem do `main`** — může
+  obsahovat víc iterací/větví najednou. Žádné průběžné dotazy "mám pokračovat?".
+- Povinné schválení v checkpointu zůstává jen u: restartu/zastavení běžících
+  procesů či kontejnerů, změny systémového crontabu, mazání dat/kontejnerů,
+  bezpečnostních nastavení. I ty sbírej do JEDNOHO checkpointu a po OK je
+  proveď všechny naráz, ne po jednom.
+- Sám dohledej další práci z `TASKS.md`; když je hotovo, napiš krátké shrnutí,
+  ne otázku "co dál?".
+
 ## Principy
 
 Stejné jako `personal/assistant/CLAUDE.md` (human-in-the-loop, vysoká autonomie
