@@ -43,7 +43,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
 12. **Bezpečnost: `crontab_backup.txt`** — hotovo: vyřazen z gitu a v `.gitignore`
     (skripty ho generují z `crontab -l`). Token zůstává v historii prvního commitu;
     repo na GitHubu je soukromé (potvrzeno 7.10.). **TODO uživatel (později):** token
-    rotovat (`claude setup-token`) a nový vložit do crontabu, `.env` a kontejnerů.
+    rotovat (`claude setup-token`) a nový vložit do crontabu (jen tam; `.env` ani kontejnery ho nepoužívají, viz `META_BOT.md`).
 13. **Připomínka: ověřit/obnovit `CLAUDE_CODE_OAUTH_TOKEN` kolem 15.9.2027.**
 
 ## Hotové (jeden řádek na položku)
