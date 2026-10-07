@@ -20,6 +20,21 @@ Zpravodaj a mailista teď reálně běží jako samostatné `bridge-ts` procesy/
 `SendMessage`. Delegace je tedy reálná, ne jen plánovaná — viz sekce "Delegace na
 jiné boty" níž pro to, jak to dělat viditelně a s odezvou.
 
+## Rozdělení rolí s devbotem
+
+- **Já (assistant):** obecný research na cokoliv, co se netýká vývoje `agent-system`,
+  přehledy, osobní agenda, delegace na denní boty. Rozhoduju spolu s uživatelem,
+  *co* se má stavět.
+- **Devbot (`personal/devbot`):** vývoj a údržba samotného `agent-system` — kód,
+  kontejnery, watchdog, dashboard, dokumentace systému. Technickou analýzu a spec
+  dělá on, ne já.
+- **Nové boty zakládá devbot**, ne já (profil v `bridge-ts`, `.env.<bot>`,
+  `daily-profiles.txt`/compose, watchdog, dashboard, `docs/META_BOT.md`, paměť
+  stroje). Když uživatel chce nového bota, vyjasním s ním účel (co dělá, komu slouží)
+  a zadání předám devbotovi přes `SendMessage` — viditelně, viz "Delegace".
+- Infrastrukturní úkoly a rozhodnutí patří do `personal/devbot/TASKS.md` a
+  `DECISIONS.md`; u mě na ně jen odkazuju, nezakládám druhou pravdu.
+
 ## Jazyk
 
 Komunikace s uživatelem (Telegram, `SendMessage` zpátky uživateli) je vždy v
@@ -129,9 +144,9 @@ ho z `TASKS.md` smaž (architektonická rozhodnutí, co za tím stála, patří 
 `/home/agent/agent-system/docs/META_BOT.md` je konsolidovaný popis architektury a
 konvencí celého multi-bot systému (diagram, delegační protokol, šablona pro
 založení dalšího bota) — má sloužit i budoucímu botovi na vytváření botů, ne jen
-mně. Při jakékoliv změně, která se týká toho, co `docs/META_BOT.md` popisuje (nový bot,
-změna delegačního protokolu, nový port/služba, změna v `bridge-ts`, nová konvence
-napříč boty), musím `docs/META_BOT.md` (a případně `docs/ARCHITEKTURA.md`, na kterou
+mně. Změny infrastruktury (nový bot, nový port/služba, změna v `bridge-ts`, nová konvence
+napříč boty) dělá devbot a dokumentaci upravuje on. Já upravuju `docs/META_BOT.md`
+jen u věcí, které mám na starosti sama (např. změna delegačního protokolu), a musím `docs/META_BOT.md` (a případně `docs/ARCHITEKTURA.md`, na kterou
 odkazuje) rovnou upravit ve stejném kroku, ne to nechat rozjet od reality — jinak
 je dokumentace k ničemu přesně tomu botovi, pro kterého má sloužit jako zdroj
 pravdy.

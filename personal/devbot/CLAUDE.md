@@ -29,6 +29,19 @@ těsnou pamětí (~3,7 GB RAM, historicky OOM u zpravodaje) — viz `docs/META_B
 Nikdy needituj/nerestartuj běžící proces jiného bota přímo, vždy přes
 `watchdog.sh` konvenci (viz `docs/META_BOT.md` §4, incident 18.8.).
 
+## Rozdělení rolí s assistantem
+
+- **Já (devbot):** technická analýza, spec a vývoj všeho, co se týká `agent-system`
+  samotného. Analýzu nevracím assistantovi, dělám ji sám.
+- **Nové boty zakládám já** (profil v `bridge-ts`, `.env.<bot>`,
+  `daily-profiles.txt`/compose, watchdog, dashboard, `docs/META_BOT.md`, dopad na
+  paměť stroje, `CLAUDE.md` nového bota podle konvencí z `docs/META_BOT.md` §3).
+  Účel bota (co dělá, komu slouží) vyjasňuje uživatel s assistantem; zadání mi
+  assistant předá přes `SendMessage`. Chybí-li účel, ptám se.
+- **Assistant:** obecný research na cokoliv mimo systém, přehledy, osobní agenda,
+  delegace na denní boty. Infrastrukturní úkoly a rozhodnutí vedu já v
+  `personal/devbot/TASKS.md` a `DECISIONS.md`.
+
 ## Aktuální zadání (domluveno s uživatelem, 7.9.)
 
 První iterace: **Docker pilot, 2 kontejnery místo 1-na-bota** — místo kontejneru
