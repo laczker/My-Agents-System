@@ -131,6 +131,12 @@ při čtení zase odstraňuje — pokud budeš `chat_history.txt` někdy prohlí
 přímo (ne přes `getHistory()`), počítej s tím, že soubor na disku obsahuje
 neviditelné znaky navíc kolem `---` uvnitř textu výměn.
 
+**Rotace `chat_history.txt`:** `appendHistory()` po každém zápisu zkontroluje velikost; nad
+200 000 B soubor přepíše na nejnovějších max. 100 výměn a zároveň max. polovinu limitu
+(nikdy méně než `HISTORY_EXCHANGES`), atomicky přes `chat_history.txt.tmp` + `rename`.
+Oříznutá část se zahazuje (žádný archiv). Zápis i rotace jsou synchronní v jednom procesu
+bota, takže se nemíchají s jiným zápisem.
+
 ## 2. Struktura jednoho bota (šablona pro založení dalšího)
 
 Každý bot = vlastní adresář `personal/<jméno>/`:

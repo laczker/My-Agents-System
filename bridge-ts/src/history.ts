@@ -42,7 +42,16 @@ const HISTORY_KEEP_EXCHANGES = 100;
 function rotateHistory(): void {
   if (statSync(HISTORY_FILE).size <= HISTORY_MAX_BYTES) return;
   const exchanges = readFileSync(HISTORY_FILE, "utf-8").split("---\n").filter((e) => e.trim());
-  const kept = exchanges.slice(-HISTORY_KEEP_EXCHANGES).map((e) => e + "---\n").join("");
+  // Keep at most HISTORY_KEEP_EXCHANGES blocks AND at most half the byte cap (so a run of
+  // huge exchanges does not trigger a rewrite on every append), but never fewer than
+  // HISTORY_EXCHANGES, which is what getHistory() actually serves.
+  const blocks = exchanges.slice(-HISTORY_KEEP_EXCHANGES).map((e) => e + "---\n");
+  let total = 0;
+  let from = blocks.length;
+  while (from > 0 && (blocks.length - from < HISTORY_EXCHANGES || total + blocks[from - 1].length <= HISTORY_MAX_BYTES / 2)) {
+    total += blocks[--from].length;
+  }
+  const kept = blocks.slice(from).join("");
   const tmp = `${HISTORY_FILE}.tmp`;
   writeFileSync(tmp, kept);
   renameSync(tmp, HISTORY_FILE);

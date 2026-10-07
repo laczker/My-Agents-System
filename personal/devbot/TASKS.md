@@ -11,7 +11,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    single-file mount, kontejnerový assistant je nemůže upravovat. Přesun do
    adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. **Hotovo (`708fed0`, nasazeno).**
 4. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
-   netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M.
+   netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M. **Hotovo (větev `devbot/history-rotation`, čeká na merge a nasazení).**
 5. **Drobnosti** — ověření SendMessage kontejner → kontejner (iterace 9);
    postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
    na hostu); po každém worktree ověřit `git merge-base HEAD main`.
