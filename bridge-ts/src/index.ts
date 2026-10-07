@@ -8,7 +8,7 @@ import { clearAuthError, markAuthError, startHeartbeatLoop, touchHeartbeat } fro
 import { downloadAttachment } from "./attachments.js";
 import { Job, loadQueueState, saveQueueState } from "./queue.js";
 import { formatResetTimeLocal } from "./rateLimit.js";
-import { sendText, reactTo } from "./telegramSend.js";
+import { sendText } from "./telegramSend.js";
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
 
@@ -228,19 +228,10 @@ bot.on("message", async (ctx) => {
   const wasIdle = jobQueue.length === 0 && !processing;
   jobQueue.push({ userText, downloadedFileInfo, chatId, messageId: msg.message_id });
   persistQueue();
-  // The typing indicator (startTypingIndicator, started right at the beginning of
-  // processQueue) doesn't show up in an open conversation on some clients (only in
-  // the chat list), so there's an explicit acknowledgement as well: a reaction on the
-  // user's message when idle (no extra message in the chat), falling back to the old
-  // text if the reaction fails. A queued message keeps its text, which carries the
-  // queue position.
+  // Explicit acknowledgement as well as the typing indicator, which doesn't show up in
+  // an open conversation on some clients (only in the chat list).
   if (wasIdle) {
-    const job = jobQueue[jobQueue.length - 1];
-    void reactTo(bot.api, chatId, msg.message_id).then((ok) => {
-      // Skip the fallback once the job has already been picked up, so a stale
-      // "processing" text can't land below the result.
-      if (!ok && jobQueue.includes(job)) sendMsg(`⏳ Zpracovávám...`, chatId, msg.message_id);
-    });
+    sendMsg(`⏳ Zpracovávám...`, chatId, msg.message_id);
   } else {
     sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId, msg.message_id);
   }
