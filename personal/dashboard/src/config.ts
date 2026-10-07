@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 // Bots the dashboard watches — manually maintained list matching `bridge-ts/src/config.ts`
 // (BOT_DIR/heartbeat_ts.txt per bot) and `watchdog.sh` (pgrep pattern per bot). A new bot
 // = a new line here + a new block in `watchdog.sh`.
@@ -19,15 +21,28 @@ export interface BotDef {
   inContainer?: "daily-bots" | "project-bots";
 }
 
-export const BOTS: BotDef[] = [
-  { name: "assistant", dir: "/home/agent/agent-system/personal/assistant", killPattern: "tsx src/index.ts$", envFile: "/home/agent/agent-system/.env", inContainer: "daily-bots" },
-  { name: "zpravodaj", dir: "/home/agent/agent-system/personal/zpravodaj", killPattern: "tsx src/index.ts zpravodaj", envFile: "/home/agent/agent-system/.env.zpravodaj", inContainer: "daily-bots" },
-  { name: "mailista", dir: "/home/agent/agent-system/personal/mailista", killPattern: "tsx src/index.ts mailista", envFile: "/home/agent/agent-system/.env.mailista", inContainer: "daily-bots" },
-  { name: "joby", dir: "/home/agent/agent-system/personal/joby", killPattern: "tsx src/index.ts joby", envFile: "/home/agent/agent-system/.env.joby", inContainer: "daily-bots" },
-  { name: "nakup", dir: "/home/agent/agent-system/personal/nakup", killPattern: "tsx src/index.ts nakup", envFile: "/home/agent/agent-system/.env.nakup", inContainer: "daily-bots" },
+const BOT_LIST: BotDef[] = [
+  { name: "assistant", dir: "/home/agent/agent-system/personal/assistant", killPattern: "tsx src/index.ts$", envFile: "/home/agent/agent-system/.env" },
+  { name: "zpravodaj", dir: "/home/agent/agent-system/personal/zpravodaj", killPattern: "tsx src/index.ts zpravodaj", envFile: "/home/agent/agent-system/.env.zpravodaj" },
+  { name: "mailista", dir: "/home/agent/agent-system/personal/mailista", killPattern: "tsx src/index.ts mailista", envFile: "/home/agent/agent-system/.env.mailista" },
+  { name: "joby", dir: "/home/agent/agent-system/personal/joby", killPattern: "tsx src/index.ts joby", envFile: "/home/agent/agent-system/.env.joby" },
+  { name: "nakup", dir: "/home/agent/agent-system/personal/nakup", killPattern: "tsx src/index.ts nakup", envFile: "/home/agent/agent-system/.env.nakup" },
+  { name: "trener", dir: "/home/agent/agent-system/personal/trener", killPattern: "tsx src/index.ts trener", envFile: "/home/agent/agent-system/.env.trener" },
   { name: "fbalbums", dir: "/home/agent/agent-system/personal/fbalbums", killPattern: "tsx src/index.ts fbalbums", envFile: "/home/agent/agent-system/.env.fbalbums", inContainer: "project-bots" },
   { name: "devbot", dir: "/home/agent/agent-system/personal/devbot", killPattern: "tsx src/index.ts devbot", envFile: "/home/agent/agent-system/.env.devbot" },
 ];
+
+// Single source of truth for the daily-bots container profiles: `daily-profiles.txt` in the
+// repo root, also read by `watchdog.sh` and `start-daily.sh`. Read once at dashboard startup
+// (changing the list needs a dashboard restart). Throws if missing/empty rather than silently
+// treating every daily bot as a host process (the restart button would then no-op).
+const DAILY_PROFILES_FILE = "/home/agent/agent-system/daily-profiles.txt";
+const dailyProfiles = new Set(readFileSync(DAILY_PROFILES_FILE, "utf-8").split(/\s+/).filter(Boolean));
+if (dailyProfiles.size === 0) throw new Error(`${DAILY_PROFILES_FILE} is empty`);
+
+export const BOTS: BotDef[] = BOT_LIST.map((bot) =>
+  dailyProfiles.has(bot.name) ? { ...bot, inContainer: "daily-bots" as const } : bot,
+);
 
 // Heartbeat is written every 15s (HEARTBEAT_INTERVAL_MS in bridge-ts/src/config.ts).
 // Threshold is > 2x that interval, so a brief write hiccup doesn't render a bot as stuck.

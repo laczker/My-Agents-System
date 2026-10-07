@@ -439,7 +439,28 @@ nezapisuje); dosud jen směr host → kontejner.
 a `DAILY_PROFILES` ve `watchdog.sh` obsahují `trener`, hostový `pgrep`/`nohup` blok je
 smazán (jinak by vznikly dva pollery na jednom tokenu, 409). `checkin.sh` (cron
 13:00/23:00) zůstává na hostu. Pád jen `trener` restartuje celý `daily-bots` (stejně
-jako u ostatních profilů). Dashboard `trener` zatím nezobrazuje (není v `BOTS`).
+jako u ostatních profilů). (Dashboard `trener` přidán v iteraci 12, viz níž.)
+
+**Iterace 11 — `~/.claude` jako read-only adresářový mount:** single-file mount
+`.credentials.json` držel po refreshi tokenu na hostu starý (expirovaný) soubor (tmp+rename
+= nový inode) -> 401 v kontejneru. Oba compose soubory proto mountují celý
+`/home/agent/.claude` jako `:ro` adresář (vždy aktuální obsah; kontejner token nikdy
+neobnovuje, takže není race s hostem) a nad něj rw vnořený mount `~/.claude/sessions`
+(registr z iterace 9). `~/.claude.json` zůstává single-file mount (viz TASKS.md devbota).
+
+**Iterace 12 — limity paměti, pinnutý název projektu, jedna verze CLI:** (a) `mem_limit`:
+`daily-bots` 1536m (naměřeno ~745 MiB, ~2x rezerva), `project-bots` 512m (naměřeno ~200 MiB);
+limit omezí jeden vyběhlý profil, aby neshodil druhý kontejner ani hostové boty z ~3,7 GB RAM.
+`restart` zůstává `"no"` — restartuje jedině `watchdog.sh` (docker-level policy by se s jeho
+force-recreate prala). (b) `name: agent-system-daily` / `agent-system-project` + pinnutý
+`container_name` (`agent-system-daily-bots-1`, `agent-system-project-bots-1`): oba soubory dřív sdílely
+project name `agent-system`, takže `up` jednoho hlásil kontejner druhého jako orphan a
+`--remove-orphans` by ho smazal. Názvy kontejnerů se nemění (nic na ně nereferuje podle
+jména; `watchdog.sh` používá `-f` + název služby), ale změna project labelu znamená
+jednorázový recreate: starý kontejner je nutné před `up -d` ručně odstranit (`docker rm -f`),
+jinak `up` skončí konfliktem názvu. **Nikdy `--remove-orphans`.** (c) `ARG CLAUDE_CLI_VERSION`
+v obou Dockerfilech (default = `claude --version` na hostu, 2.1.291) místo natvrdo
+zapsaného pinu 2.1.280.
 
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
@@ -458,6 +479,8 @@ Plný popis incidentů a jejich oprav (rate limit handling, race condition v
 ne náhrada. Novější `bridge-ts` změny (OAuth fallback, Telegram UX, rate-limit
 timeout fallback) se od založení `devbot` (7.9.) zapisují do
 `personal/devbot/DECISIONS.md` místo sem.
+
+> Note (iter. 12): dashboard now shows 7 bots (`trener` added to `BOTS` in `personal/dashboard/src/config.ts`). The daily-bots profile list lives in one file, `daily-profiles.txt` (repo root), read by `watchdog.sh`, `start-daily.sh` (via a ro mount `/daily-profiles.txt` in `docker-compose.daily.yml`) and the dashboard (sets `inContainer: "daily-bots"` at startup). Adding a daily bot = edit that file + `.env`/`personal/<bot>` mounts in compose + a `BOTS` entry. Rollout: restart the dashboard (reads the file at startup) and `up -d --build --force-recreate` for daily-bots (`start-daily.sh` changed, baked into the image).
 
 > Note (iter. 10): `start-daily.sh` is baked into the daily image; after editing it run `up -d --build --force-recreate`.
 

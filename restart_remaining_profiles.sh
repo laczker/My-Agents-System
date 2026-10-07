@@ -23,7 +23,9 @@
 # cron-started process instead of checking a PID this script launched
 # itself.
 #
-# NOTE (left for a separate iteration, see personal/devbot/TASKS.md): the
+# NOTE (TASKS.md item 11, deliberately left as is): processes are stopped
+# 3s apart, but the restart burst is done by watchdog.sh in one cron tick,
+# so real batching would need a watchdog change. Also: the
 # cron watchdog is still disabled for the whole stop-all loop across all 7
 # profiles (tens of seconds), not just per profile. Shrinking that further
 # would mean restructuring the loop to disable/stop/re-enable per profile,
@@ -71,7 +73,7 @@ if [ -z "${RESTART_REMAINING_DETACHED:-}" ]; then
     send_alert "⚠️ restart_remaining_profiles.sh: chybí příkaz setsid, restart jsem bezpečně odmítl spustit (cron watchdog zůstal beze změny)."
     exit 1
   fi
-  RESTART_REMAINING_DETACHED=1 setsid "$0" "$@" < /dev/null >> "$LOG" 2>&1 &
+  RESTART_REMAINING_DETACHED=1 setsid "$(readlink -f "$0")" "$@" < /dev/null >> "$LOG" 2>&1 &
   disown
   exit 0
 fi
@@ -139,17 +141,17 @@ stop_profile() {
 
 stop_profile "assistant" 'src/index\.ts$'
 sleep 3
-stop_profile "zpravodaj" 'src/index\.ts zpravodaj'
+stop_profile "zpravodaj" 'src/index\.ts zpravodaj$'
 sleep 3
-stop_profile "mailista" 'src/index\.ts mailista'
+stop_profile "mailista" 'src/index\.ts mailista$'
 sleep 3
-stop_profile "joby" 'src/index\.ts joby'
+stop_profile "joby" 'src/index\.ts joby$'
 sleep 3
-stop_profile "nakup" 'src/index\.ts nakup'
+stop_profile "nakup" 'src/index\.ts nakup$'
 sleep 3
-stop_profile "fbalbums" 'src/index\.ts fbalbums'
+stop_profile "fbalbums" 'src/index\.ts fbalbums$'
 sleep 3
-stop_profile "trener" 'src/index\.ts trener'
+stop_profile "trener" 'src/index\.ts trener$'
 sleep 2
 
 # Re-enable the watchdog now that all 7 old processes have been stopped --

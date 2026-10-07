@@ -1,12 +1,20 @@
 # Docker pilot (personal/devbot/CLAUDE.md) — skupina denních botů (assistant,
 # zpravodaj, mailista, joby, nakup, trener) v jednom kontejneru. Kontejner hlídá
 # watchdog.sh (compose ps + exec pgrep, viz META_BOT.md §4a). Všech 6 profilů běží
-# v kontejneru (iterace 6-8 a 10); start-daily.sh defaultuje na všech 6, takže
-# DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
+# v kontejneru (iterace 6-8 a 10); start-daily.sh čte seznam z daily-profiles.txt
+# (mount), DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
 # watchdogu i hostové procesy, takže hostový proces stejného profilu musí být
 # před cutoverem zastavený.
+# Pinned project name + container name: without `name:` the project name is the
+# directory name, and both compose files shared it (`agent-system`), so `up` of one
+# file reported the other's container as an orphan (`--remove-orphans` would delete
+# it). container_name keeps the historical name `agent-system-daily-bots-1`, so nothing
+# that refers to it by name changes.
+name: agent-system-daily
+
 services:
   daily-bots:
+    container_name: agent-system-daily-bots-1
     build:
       context: .
       dockerfile: Dockerfile.daily
@@ -40,6 +48,8 @@ services:
       # `Edit` nástroj píše přes tmp+rename, takže zápis skončí na novém inode,
       # co bind mount vůbec nevidí). Skutečné rw řešení (adresářový mount) je
       # samostatná budoucí položka, viz TASKS.md.
+      # Profile list shared with watchdog.sh and the dashboard (read by start-daily.sh).
+      - ./daily-profiles.txt:/daily-profiles.txt:ro
       - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
       - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
       # Whole ~/.claude as a READ-ONLY directory mount: a single-file mount of
@@ -52,4 +62,12 @@ services:
       - /home/agent/.claude/sessions:/home/agent/.claude/sessions
       - /home/agent/.claude.json:/home/agent/.claude.json:ro
       - /tmp/cc-socks:/tmp/cc-socks
+    # Measured with `docker stats --no-stream` (2026-10-07): ~745 MiB for all 6 bridge-ts
+    # profiles + their claude subprocesses. 1.5 GiB = ~2x headroom, and caps a runaway
+    # profile at under half of the ~3.7 GiB host so it cannot OOM-kill the other containers
+    # or the host-side bots (devbot, dashboard). Hitting the cap OOM-kills a process inside
+    # the container; watchdog.sh notices the missing bridge-ts and force-recreates.
+    mem_limit: 1536m
+    # No restart policy on purpose: watchdog.sh (cron, every minute) is the single
+    # restarter; a docker-level policy would race with its force-recreate.
     restart: "no"

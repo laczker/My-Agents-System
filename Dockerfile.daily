@@ -5,6 +5,13 @@
 # a stavové soubory zůstaly ve stejném formátu pro případnou budoucí migraci.
 FROM node:20-slim
 
+# Single place to bump the claude CLI version: keep it equal to `claude --version` on
+# the host (2.1.291 when written; the previous pin 2.1.280 had drifted). Dockerfile.daily
+# and Dockerfile.project must carry the same default. Override per build with
+# `docker compose build --build-arg CLAUDE_CLI_VERSION=x.y.z`. Bumping needs an image
+# rebuild + container recreate.
+ARG CLAUDE_CLI_VERSION=2.1.291
+
 # procps — poskytuje `pgrep`/`pkill`, co node:20-slim samo o sobě nemá.
 # watchdog.sh (iterace 6, canary cutover nakup) se dovnitř `exec`uje a
 # hlídá/restartuje bridge-ts proces tímhle nástrojem; dashboard restart
@@ -20,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends procps \
 # Bez pinu by build v jiný den mohl stáhnout novější CLI s jinou sadou/chováním
 # `--stream-json` flagů, než na jaké je claudeProcess.ts psaný — verzi je potřeba
 # ručně bump-nout spolu s ověřením při aktualizaci hostitelského CLI.
-RUN npm install -g @anthropic-ai/claude-code@2.1.280
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CLI_VERSION}
 
 WORKDIR /home/agent/agent-system/bridge-ts
 COPY bridge-ts/package.json bridge-ts/package-lock.json ./
