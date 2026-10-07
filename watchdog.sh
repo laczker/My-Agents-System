@@ -20,8 +20,8 @@ record_restart() {
 cd /home/agent/agent-system/bridge-ts || exit 1
 
 # Všech 6 denních profilů (nakup iter. 6, assistant iter. 7, zpravodaj/mailista/joby iter. 8, trener iter. 10) běží v daily-bots
-# kontejneru místo na hostu — musí sedět s DAILY_PROFILES v
-# docker-compose.daily.yml. Dvoukrokové hlídání (ne jen pgrep uvnitř
+# kontejneru místo na hostu — seznam profilů je v
+# daily-profiles.txt. Dvoukrokové hlídání (ne jen pgrep uvnitř
 # kontejneru přímo):
 # 1) `docker compose ps` — pokud selže (daemon nedostupný), jen zalogovat a
 #    nic nerestartovat, ať se netváří, že profil spadl, když problém je jinde
@@ -34,7 +34,12 @@ cd /home/agent/agent-system/bridge-ts || exit 1
 # Sdílený registr session (mounty v compose souborech): po rebootu /tmp zmizí a Docker by
 # chybějící adresář vytvořil jako root, takže kontejner (uid 1000) by do něj nezapsal.
 mkdir -p -m 700 /home/agent/.claude/sessions /tmp/cc-socks
-DAILY_PROFILES="assistant zpravodaj mailista joby nakup trener"
+# Single source of truth: daily-profiles.txt (also read by start-daily.sh in the container
+# and by the dashboard). Fail loudly if missing/empty instead of silently watching nothing.
+DAILY_PROFILES=$(cat /home/agent/agent-system/daily-profiles.txt 2>/dev/null)
+if [ -z "$DAILY_PROFILES" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') daily-profiles.txt chybí nebo je prázdný, přeskakuji daily-bots kontrolu" >> /home/agent/agent-system/watchdog.log
+fi
 compose_ps_output=$(docker compose -f /home/agent/agent-system/docker-compose.daily.yml ps --status running --services 2>>/home/agent/agent-system/watchdog.log)
 if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') docker compose ps pro daily-bots selhalo (daemon nedostupný?), přeskakuji" >> /home/agent/agent-system/watchdog.log
