@@ -28,8 +28,9 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
     5.10. řekl "teď neřešit"; čeká na pokyn. Velikost: M–L.
 11. **`unescapeDelimiter` a zero-width space** — nízká priorita, řešit až se
     změnou formátu na JSON-lines.
-12. **Bezpečnost: `crontab_backup.txt` je v gitu a obsahuje plaintext
-    `CLAUDE_CODE_OAUTH_TOKEN`** — gitignore / placeholder; vyžaduje schválení.
+12. **Bezpečnost: `crontab_backup.txt`** — hotovo: vyřazen z gitu a v `.gitignore`
+    (skripty ho generují z `crontab -l`). Token zůstává v historii prvního commitu;
+    pokud repo někdy půjde na vzdálený server, token rotovat.
 13. **Připomínka: ověřit/obnovit `CLAUDE_CODE_OAUTH_TOKEN` kolem 15.9.2027.**
 
 ## Hotové (jeden řádek na položku)
