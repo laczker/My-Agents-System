@@ -140,7 +140,7 @@ QUIESCE_MIN_WAIT=${QUIESCE_MIN_WAIT:-5}
 is_busy() {
   [ -f "$BUSY_FILE" ] || return 1
   local ts now_ms
-  ts=$(sed -n 's/.*"ts":\([0-9]*\).*/\1/p' "$BUSY_FILE" 2>/dev/null)
+  ts=$(sed -n 's/.*"ts"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$BUSY_FILE" 2>/dev/null)
   # Unparsable marker: treat as busy (the stale cap cannot be evaluated, the
   # QUIESCE_TIMEOUT still bounds the wait).
   [ -n "$ts" ] || return 0

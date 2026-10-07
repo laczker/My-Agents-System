@@ -6,7 +6,7 @@ import { getSessionId, saveSessionId } from "./session.js";
 import { getHistory, appendHistory } from "./history.js";
 import { looksLikeRateLimitText, parseResetsAtFromText, normalizeResetsAt } from "./rateLimit.js";
 import { logTurn } from "./turnLog.js";
-import { clearBusy, markBusy } from "./busy.js";
+import { BusyTracker } from "./busy.js";
 
 interface ClaudeResult {
   result: string;
@@ -69,6 +69,8 @@ export class ClaudeProcess {
   // reset alongside `unsolicitedText` at the same two points (new process in `start()`,
   // end of turn in the `result` handler).
   private firstBlockSeen = false;
+  // Sole owner of the busy marker (see busy.ts); `send()` and unsolicited turns are separate sources.
+  private busy = new BusyTracker(BUSY_FILE);
 
   /** `bridge-ts` calls `send()` only for messages coming from Telegram. Cross-session
    * messages (a `SendMessage` from another bot) are delivered by the runtime directly
@@ -130,8 +132,8 @@ export class ClaudeProcess {
     this.expectingResponse = false;
     this.unsolicitedText = "";
     this.firstBlockSeen = false;
-    // A previous process may have died mid-turn and left the marker behind.
-    clearBusy(BUSY_FILE);
+    // The old process's unsolicited turn is over; an in-flight send() keeps its own source.
+    this.busy.set("unsolicited", false);
     this.rl = createInterface({ input: proc.stdout! });
     this.rl.on("line", (line) => {
       if (this.proc === proc) this.onLine(line);
@@ -142,7 +144,7 @@ export class ClaudeProcess {
   }
 
   private onExit(): void {
-    clearBusy(BUSY_FILE);
+    this.busy.set("unsolicited", false);
     const waiter = this.waiters.shift();
     if (waiter) waiter(null);
   }
@@ -194,7 +196,7 @@ export class ClaudeProcess {
       return;
     }
     if (obj.type === "assistant") {
-      markBusy(BUSY_FILE);
+      this.busy.set("unsolicited", true);
       const blocks = obj.message?.content ?? [];
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
@@ -211,7 +213,7 @@ export class ClaudeProcess {
       }
     }
     if (obj.type === "result") {
-      clearBusy(BUSY_FILE);
+      this.busy.set("unsolicited", false);
       // `obj.result` is sometimes non-string too (observed in practice) — in that
       // case nothing gets broadcast (the earlier `assistant` block already went out
       // live), but for the history write the last streamed `assistant` text
@@ -285,12 +287,12 @@ export class ClaudeProcess {
   async send(promptText: string, timeoutMs = CLAUDE_TURN_TIMEOUT_MS): Promise<ClaudeResult> {
     if (!this.proc) throw new Error("claude proces není nastartovaný");
     this.expectingResponse = true;
-    markBusy(BUSY_FILE);
+    this.busy.set("send", true);
     try {
       return await this.sendAndAwaitResult(promptText, timeoutMs);
     } finally {
       this.expectingResponse = false;
-      clearBusy(BUSY_FILE);
+      this.busy.set("send", false);
     }
   }
 
