@@ -21,11 +21,11 @@ export function getHistory(): string {
 // would permanently leak into the seeded context on every subsequent read, even for
 // text that never had a real collision.
 function escapeDelimiter(text: string): string {
-  return text.replace(/---\n/g, "---​\n");
+  return text.replace(/---(​*)\n/g, "---​$1\n");
 }
 
 function unescapeDelimiter(text: string): string {
-  return text.replace(/---​\n/g, "---\n");
+  return text.replace(/---​(​*)\n/g, "---$1\n");
 }
 
 // The file only grows on append, while `getHistory()` needs just the last few

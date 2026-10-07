@@ -30,8 +30,9 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    nebo omezení. Viz `DECISIONS.md`. Sebe-restart řeší č. 6.
 10. **Sjednotit chování agentů / jazyk a frekvence mezikroků** — uživatel
     5.10. řekl "teď neřešit"; čeká na pokyn. Velikost: M–L.
-11. **`unescapeDelimiter` a zero-width space** — nízká priorita, řešit až se
-    změnou formátu na JSON-lines.
+11. ~~**`unescapeDelimiter` a zero-width space**~~ — HOTOVO: escape je teď
+    bijektivní (přidá/odebere jedno ZWSP před `\n`), takže původní ZWSP v textu
+    přežije round-trip; změna formátu na JSON-lines nebyla potřeba.
 12. **Bezpečnost: `crontab_backup.txt`** — hotovo: vyřazen z gitu a v `.gitignore`
     (skripty ho generují z `crontab -l`). Token zůstává v historii prvního commitu;
     repo na GitHubu je soukromé (potvrzeno 7.10.). **TODO uživatel (později):** token
