@@ -19,7 +19,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    do `chat_history.txt`, po restartu navázat. Potřeba spec. Velikost: M.
 7. **Watchdog iterace B: "běží, ale auth nefunguje"** — process-level detekce
    OAuth výpadku. Creds v kontejneru jsou read-only, refresh dělá jen host.
-   Velikost: M. Potřeba spec.
+   Velikost: M. **Hotovo (iterace 13, `auth_watch.sh`, viz `META_BOT.md`).**
 8. **Telegram UX, druhá vlna** — `reply_parameters`, `setMessageReaction`,
    `editMessageText`. Sdílený kód všech botů. Velikost: M.
 9. **Přesun devbota do kontejneru** — nemůže restartovat sám sebe, pracuje nad
