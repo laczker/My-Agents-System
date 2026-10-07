@@ -17,24 +17,32 @@ proměnné a restart.
 
 ## Uložení
 
-`shopping_list.json` v tomhle adresáři, pole položek `{name, added_at}` —
-žádná DB, žádný stav "koupeno" (koupená položka se rovnou maže ze seznamu,
-žádná historie nákupů se nedrží).
+`shopping_list.json` v tomhle adresáři, od 30.9. rozdělený na dva seznamy
+podle kategorie: `potraviny` a `veci_do_bytu`, každý pole položek
+`{name, added_at}` — žádná DB, žádný stav "koupeno" (koupená položka se
+rovnou maže ze seznamu, žádná historie nákupů se nedrží). Kategorii u nové
+položky odhaduju sám podle povahy věci (jídlo/pití vs. vybavení bytu); když
+to není jednoznačné (např. věc by šla zařadit do obou, nebo nejde poznat o
+co jde), zeptat se zpět, ne hádat.
 
 ## Tři typy zpráv (přirozený jazyk, ne klíčová slova)
 
 1. **Přidání** — "dochází nám mléko", "kup rohlíky", "přidej vejce" → přidat
-   položku, pokud tam ještě není (jiný tvar/pád stejné věci = duplicita,
-   nepřidávat znovu, jen potvrdit, že už tam je).
+   položku do odpovídajícího seznamu (potraviny/věci do bytu), pokud tam
+   ještě není (jiný tvar/pád stejné věci = duplicita, nepřidávat znovu, jen
+   potvrdit, že už tam je).
 2. **Odebrání/koupeno** — "koupili jsme mléko", "vyškrtni rohlíky" → smazat
-   položku ze seznamu.
-3. **Dotaz na stav** — "co nakoupit", "co nám chybí" → vypsat aktuální
-   seznam; prázdný seznam → říct to výslovně ("seznam je momentálně
-   prázdný"), ne mlčet.
+   položku z příslušného seznamu (hledat v obou, pokud není jasné odkud).
+3. **Dotaz na stav** — "co nakoupit", "co nám chybí" → vypsat oba seznamy
+   zvlášť (potraviny, věci do bytu); prázdný seznam → říct to výslovně u
+   dané kategorie ("potraviny: prázdno"), ne mlčet. Pokud jsou prázdné oba,
+   říct to za oba najednou.
 
-Nejednoznačná zpráva (nejde poznat přidání vs. dotaz) → zeptat se zpět, ne
-hádat. Potvrzení krátká ("✅ Přidáno: mléko", "🛒 Koupeno: vejce"). Nedělám nic
-navíc (nekupuju, negeneruju recepty) — jen držím a hlásím seznam.
+Nejednoznačná zpráva (nejde poznat přidání vs. dotaz, nebo kategorie) →
+zeptat se zpět, ne hádat. Potvrzení krátká a s kategorií, pokud není z
+kontextu zprávy zjevná ("✅ Přidáno do potravin: mléko", "✅ Přidáno do věcí
+do bytu: organizér na příbory", "🛒 Koupeno: vejce"). Nedělám nic navíc
+(nekupuju, negeneruju recepty) — jen držím a hlásím seznam.
 
 ## Principy
 

@@ -155,8 +155,28 @@ fi
 BATCH_ERROR_LINE=$(echo "$OUTPUT" | grep '^BATCH_ERROR:' | tail -1)
 if [ -n "$BATCH_ERROR_LINE" ]; then
   REASON=$(echo "$BATCH_ERROR_LINE" | sed 's/^BATCH_ERROR: //')
-  log "FAIL (batch-error) $REASON"
-  send_telegram "⚠️ Denní třídění inboxu dnes neproběhlo: ${REASON} — další pokus až zítra, mrkni na nightly_cleanup_log.txt."
+  # Známá příčina od 22.9. (viz DECISIONS.md): ~/.claude.json obsahuje
+  # tengu_mcp_local_oauth_blocked_hosts s gmail.mcp.claude.com — vzdálený
+  # feature-flag blokuje headless/CLI OAuth ke Gmail MCP, netýká se
+  # tokenu/loginu na tomhle stroji.
+  NOTE=""
+  KNOWN_GMAIL_OUTAGE=0
+  case "$REASON" in
+    *[Gg]mail*|*[Oo][Aa]uth*)
+      NOTE=" (známá příčina od 22.9. — viz DECISIONS.md: vzdálený feature-flag tengu_mcp_local_oauth_blocked_hosts blokuje headless OAuth ke Gmail MCP, není to token/login na tomhle stroji)"
+      KNOWN_GMAIL_OUTAGE=1
+      ;;
+  esac
+  log "FAIL (batch-error) ${REASON}${NOTE}"
+  # Uživatel 1.10. výslovně požádal: dokud trvá tahle ZNÁMÁ Gmail/OAuth
+  # příčina, neposílat denně identickou Telegram zprávu (bylo to 15 dní v
+  # řadě stejné hlášky) — jen potichu zalogovat. Jakmile dávka zase projde,
+  # úspěšná větev níž pošle normální zprávu, takže se stav neztratí. Jiná/
+  # nová příčina (KNOWN_GMAIL_OUTAGE=0) se pořád hlásí hned, protože jde o
+  # dřív neviděný problém, který by jinak nikdo nezachytil.
+  if [ "$KNOWN_GMAIL_OUTAGE" -eq 0 ]; then
+    send_telegram "⚠️ Denní třídění inboxu dnes neproběhlo: ${REASON}${NOTE} — další pokus až zítra, mrkni na nightly_cleanup_log.txt."
+  fi
   exit 1
 fi
 

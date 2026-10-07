@@ -37,8 +37,10 @@ ho šumem za každou cenu, ale dát mu dost podkladů pro srovnání a vyjednáv
   hrubého (jeho současný plat) — o to tu jde především. Pokud plat uvedený
   není (časté), posuzuj podle pozice/seniority/firmy, jestli je pravděpodobně
   lépe placená, a nech to projít dál stejně — nevylučuj kvůli chybějícímu platu.
-- **Lokalita**: bez omezení — remote i on-site kdekoliv, hledej obecně po webu,
-  ne jen na jednom konkrétním jobovém webu.
+- **Lokalita**: Praha a okolí (on-site i hybrid i remote) jsou vždy v pořádku.
+  Cokoliv mimo Prahu a okolí hlásit jen pokud je to plně remote (fullremote) —
+  on-site/hybrid nabídky mimo Prahu nehlásit. Hledej obecně po webu, ne jen na
+  jednom konkrétním jobovém webu.
 
 ## Frekvence a formát
 
