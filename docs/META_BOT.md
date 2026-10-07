@@ -249,8 +249,15 @@ Pravidlo pro volbu při zakládání bota:
    samostatný skript (`daily_digest.sh`, `ai_news_digest.sh`) nezávislý na
    `bridge-ts`/Claude session, spuštěný ze **systémového** `crontab` (`crontab -e`,
    ne `CronCreate`), který si sám zavolá `claude -p` a pošle výsledek. Protože jde o
-   sdílený systémový crontab (§4), přidání řádku je změna, kterou si bot musí
-   nechat schválit uživatelem předem (nízká autonomie), ne založit sám.
+   sdílený systémový crontab (§4), bot do něj řádek nepřidává. Místo toho (iter. 14)
+   vloží řádek do **`personal/<bot>/cron.txt`**: `minuta hodina den měsíc den-v-týdnu
+   skript [args]` (syntaxe `*`, `N`, `a,b`, `a-b`, `*/n`; čas Europe/Prague). Každou
+   minutu to z `watchdog.sh` vyhodnotí `run_bot_crons.sh` a odpovídající skripty spustí
+   odpojeně (výstup do `personal/<bot>/cron_stderr.txt`, záznam do `watchdog.log`).
+   Skript musí být spustitelný soubor uvnitř adresáře téhož bota (cesta se rozřeší
+   včetně symlinků, jinak se přeskočí). Flock proti dvojímu běhu a Telegram varování při
+   chybě zůstávají na skriptu samotném. Pozn.: kontejnerový bot tak může spustit kód
+   na hostu (skript ve svém adresáři) — dřív to hlídal schvalovaný zápis do crontabu.
    `CronCreate` zůstává v pořádku jen pro krátkodobé probouzení uvnitř JEDNOHO
    aktivního běhu, co se odehraje a skončí v řádu hodin (mailista, noční dávková
    smyčka, viz §1) — ne pro cokoliv, co má přežít přes den/restart.
@@ -476,3 +483,5 @@ timeout fallback) se od založení `devbot` (7.9.) zapisují do
 > Note (iter. 11): `~/.claude` is now mounted as a whole directory, read-only, with `sessions/` as a nested rw mount, in both compose files (instead of single-file `.credentials.json` + `sessions/`). A token refresh on the host no longer leaves containers with a stale inode (401). Containers still cannot refresh the token themselves. Needs `up -d --force-recreate` to take effect. `~/.claude.json` is still a single-file ro mount (same inode caveat, not yet hit).
 
 > Note (iter. 13): `watchdog.sh` staggers starts: at most `MAX_STARTS_PER_TICK` (2) starts per run (container up/recreate or host process: daily-bots, project-bots, devbot, dashboard, zpravodaj-webapp), `STAGGER_SECS` (15) sleep between consecutive starts; the rest is deferred to the next cron tick (logged as "deferred to next tick"). No deploy needed besides the file itself (cron runs it from the repo). `restart_remaining_profiles.sh` now matches the assistant with `" src/index\.ts$"` (leading space) so it no longer also matches the dashboard / zpravodaj webapp. Not staggered: the profiles inside one container (`start-daily.sh` still launches all at once).
+
+> Note (iter. 14): per-bot `cron.txt` (`run_bot_crons.sh`, called first in `watchdog.sh`) — see §3 point 5. Existing system-crontab scripts (zpravodaj, joby, mailista, trener) are unchanged.
