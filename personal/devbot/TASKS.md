@@ -16,7 +16,9 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
    na hostu); po každém worktree ověřit `git merge-base HEAD main`.
 6. **Sebe-restart devbota může useknout vlastní odpověď** — čekat na zápis tahu
-   do `chat_history.txt`, po restartu navázat. Potřeba spec. Velikost: M.
+   do `chat_history.txt`, po restartu navázat. Velikost: M.
+   **Hotovo:** `restart_devbot.sh` čeká na prázdnou frontu + outbox + nepřítomnost
+   `busy_ts.txt` (`bridge-ts/src/busy.ts`), timeout 600 s, viz `DECISIONS.md` a `META_BOT.md`.
 7. **Watchdog iterace B: "běží, ale auth nefunguje"** — process-level detekce
    OAuth výpadku. Creds v kontejneru jsou read-only, refresh dělá jen host.
    Velikost: M. **Hotovo (iterace 13, `auth_watch.sh`, viz `META_BOT.md`).**
