@@ -300,3 +300,24 @@ případném návratu na host je na uživateli; další dockerizační práce (d
 kontejneru, TASKS č. 9) pozastavena.
 
 **Date:** 2026-10-07
+
+## Telegram UX, druhá vlna: reply, reakce, bez editMessageText
+
+**Decision:** (1) Výsledek úkolu (`✅`/`⚠️ Úkol selhal`) i "ve frontě" hláška jdou
+jako odpověď na zprávu uživatele (`reply_parameters` s
+`allow_sending_without_reply`); `message_id` je v `Job` (`job_queue_ts.json`) a
+v položce outboxu. Reply se dává jen na první chunk dlouhé zprávy. (2) Potvrzení
+příjmu u nečekající zprávy je reakce 👀 (`setMessageReaction`) místo textu
+"Zpracovávám"; při selhání API se pošle původní text. Fronta dál posílá text
+(nese pozici). (3) `editMessageText` se nezavádí.
+
+**Why:** méně zpráv v chatu, jasné párování odpovědi s dotazem. Každé volání má
+fallback: odmítnutý reply (400) se zopakuje bez reply, reakce při chybě padá na
+text; ne-400 chyby jdou dál do outboxu k opakování, takže doručení se neblokuje.
+
+**Alternatives:** `editMessageText` pro průběžný status — zamítnuto, žádný
+průběžný status neexistuje (jen typing indikátor) a editace neposílá push
+notifikaci, uživatel by o hotovém výsledku nevěděl. Logika je v
+`bridge-ts/src/telegramSend.ts`, testy `npm test` (node:test přes tsx).
+
+**Date:** 2026-10-07

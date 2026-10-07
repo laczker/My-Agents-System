@@ -8,34 +8,20 @@ import { startHeartbeatLoop, touchHeartbeat } from "./heartbeat.js";
 import { downloadAttachment } from "./attachments.js";
 import { Job, loadQueueState, saveQueueState } from "./queue.js";
 import { formatResetTimeLocal } from "./rateLimit.js";
+import { sendText, reactTo } from "./telegramSend.js";
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
 
-async function sendRaw(text: string, chatId: string): Promise<void> {
-  const chunks = text.match(/[\s\S]{1,4000}/g) ?? [text];
-  for (const chunk of chunks) {
-    try {
-      await bot.api.sendMessage(chatId, chunk, { parse_mode: "Markdown" });
-    } catch (e) {
-      // Claude doesn't generate text strictly for legacy Telegram Markdown (unbalanced/
-      // unpaired entities) — better to deliver the raw text than let it fall into the
-      // outbox, where the new 400-permanent-error logic would silently drop it (see
-      // DECISIONS.md).
-      if (e instanceof GrammyError && e.error_code === 400 && e.description.includes("can't parse entities")) {
-        await bot.api.sendMessage(chatId, chunk);
-      } else {
-        throw e;
-      }
-    }
-  }
+async function sendRaw(text: string, chatId: string, replyTo?: number): Promise<void> {
+  await sendText(bot.api, chatId, text, replyTo);
 }
 
 const outbox = new Outbox(sendRaw);
 
 /** A reply to a specific message/task — belongs to whoever asked, not to all allowed
  * chats (relevant only for bots with more than one chat ID). */
-function sendMsg(text: string, chatId: string = TELEGRAM_CHAT_ID): void {
-  outbox.enqueue(text, chatId);
+function sendMsg(text: string, chatId: string = TELEGRAM_CHAT_ID, replyTo?: number): void {
+  outbox.enqueue(text, chatId, replyTo);
 }
 
 /** System messages not tied to a specific query (start, rate limit, cross-session
@@ -188,10 +174,10 @@ async function processQueue(): Promise<void> {
         return;
       }
       if (outcome.kind === "error") {
-        sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId);
+        sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId, job.messageId);
       } else {
         appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
-        sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId);
+        sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId, job.messageId);
       }
       touchHeartbeat();
     }
@@ -237,15 +223,20 @@ bot.on("message", async (ctx) => {
   if (!userText && !downloadedFileInfo) return;
 
   const wasIdle = jobQueue.length === 0 && !processing;
-  jobQueue.push({ userText, downloadedFileInfo, chatId });
+  jobQueue.push({ userText, downloadedFileInfo, chatId, messageId: msg.message_id });
   persistQueue();
   // The typing indicator (startTypingIndicator, started right at the beginning of
   // processQueue) doesn't show up in an open conversation on some clients (only in
-  // the chat list), so a text message runs alongside it as reliable feedback.
+  // the chat list), so there's an explicit acknowledgement as well: a reaction on the
+  // user's message when idle (no extra message in the chat), falling back to the old
+  // text if the reaction fails. A queued message keeps its text, which carries the
+  // queue position.
   if (wasIdle) {
-    sendMsg(`⏳ Zpracovávám...`, chatId);
+    void reactTo(bot.api, chatId, msg.message_id).then((ok) => {
+      if (!ok) sendMsg(`⏳ Zpracovávám...`, chatId, msg.message_id);
+    });
   } else {
-    sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId);
+    sendMsg(`📥 Přijato, ve frontě (pozice ${jobQueue.length}), zpracuji hned po předchozí zprávě.`, chatId, msg.message_id);
   }
 
   // Not waiting for completion — the handler returns immediately, so grammY can accept

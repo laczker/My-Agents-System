@@ -9,6 +9,9 @@ export interface Job {
    * ID, see `TELEGRAM_CHAT_IDS_EXTRA`). Old queue items (from before this change)
    * lack this key — it falls back to `TELEGRAM_CHAT_ID`. */
   chatId?: string;
+  /** ID of the user's Telegram message, so the result can be sent as a reply to it.
+   * Absent in old queue items. */
+  messageId?: number;
 }
 
 interface QueueState {
