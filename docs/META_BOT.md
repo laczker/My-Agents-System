@@ -304,6 +304,13 @@ Sdílené (a tedy citlivé — chyba tady zasáhne víc botů najednou):
   dvakrát po sobě. Strop `QUIESCE_TIMEOUT` (600 s); po něm restartuje i tak s
   Telegram alertem — rozpracovaný job se po startu zopakuje a outbox se flushne.
   Dřívější slepé `sleep 60` useklo odpověď u delších tahů.
+- **Telegram UX (`bridge-ts/src/telegramSend.ts`)** — výsledek úkolu i hláška "ve
+  frontě" jdou jako odpověď na zprávu uživatele (`reply_parameters`,
+  `allow_sending_without_reply`; `message_id` je v `Job` a v položce outboxu; reply
+  jen na první chunk dlouhé zprávy). Odmítnutý reply (400) se zopakuje bez reply.
+  Příjem nečekající zprávy se potvrzuje reakcí 👀 (`setMessageReaction`); při chybě
+  API se pošle původní textové potvrzení. `editMessageText` se záměrně nepoužívá
+  (editace neposílá push notifikaci, viz `personal/devbot/DECISIONS.md`).
 
 ## 4a. Docker pilot — denní boti (od 7.9., `personal/devbot`)
 
