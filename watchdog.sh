@@ -31,7 +31,7 @@ throttle_start() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') start of $1 deferred to next tick (limit $MAX_STARTS_PER_TICK starts per tick)" >> /home/agent/agent-system/watchdog.log
         return 1
     fi
-    [ "$STARTS_THIS_TICK" -gt 0 ] && sleep "$STAGGER_SECS"
+    if [ "$STARTS_THIS_TICK" -gt 0 ]; then sleep "$STAGGER_SECS"; fi
     STARTS_THIS_TICK=$((STARTS_THIS_TICK + 1))
     return 0
 }
@@ -82,7 +82,7 @@ else
             down_profiles="$down_profiles $profile"
         fi
     done
-    if [ -n "$down_profiles" ] && throttle_start daily-bots; then
+    if [ -n "$down_profiles" ] && throttle_start "daily-bots (down:$down_profiles)"; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') bridge-ts (kontejner,$down_profiles) proces neběží, restartuji kontejner" >> /home/agent/agent-system/watchdog.log
         (cd /home/agent/agent-system && docker compose -f docker-compose.daily.yml up -d --force-recreate) >> /home/agent/agent-system/watchdog.log 2>&1
         for profile in $down_profiles; do

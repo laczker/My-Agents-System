@@ -25,7 +25,7 @@
 #
 # NOTE (TASKS.md item 11): processes are stopped 3s apart, and watchdog.sh now
 # staggers the restart burst itself (max 2 starts per tick, see throttle_start).
-# Also: the
+# Also (unchanged): the
 # cron watchdog is still disabled for the whole stop-all loop across all 7
 # profiles (tens of seconds), not just per profile. Shrinking that further
 # would mean restructuring the loop to disable/stop/re-enable per profile,
