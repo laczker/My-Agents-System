@@ -363,3 +363,20 @@ spolehlivě rozpoznává.
 nezjistí; aktivní sonda zůstává možné rozšíření.
 
 **Date:** 2026-10-07
+
+## Busy marker for unsolicited turns (TASKS 6 follow-up)
+
+**Decision:** `bridge-ts` writes `personal/<bot>/busy_ts.txt` (`busy.ts`) when a
+turn starts and removes it when it ends. Covered: `send()` (cleared in `finally`,
+so also on error/timeout), unsolicited turns (set on the first `assistant` event
+outside `send()`, cleared on `result`), process exit, and `start()` (leftover
+from a crash). `restart_devbot.sh` treats a present marker as not quiet; a
+marker older than `BUSY_STALE_SEC` (1800s) is ignored.
+
+**Why:** the queue/outbox check could not see cross-session turns, which are
+not in the queue (limit noted in "Self-restart waits for the turn to finish").
+
+**Limits:** an unsolicited turn is marked from its first `assistant` event, not
+from the arrival of the message, so there is a short gap. Takes effect for the
+restart script only after bridge-ts itself is restarted with this change.
+

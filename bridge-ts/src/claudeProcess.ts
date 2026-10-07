@@ -1,11 +1,12 @@
 import { spawn, ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { openSync } from "node:fs";
-import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS, CLAUDE_MODEL } from "./config.js";
+import { CLAUDE_CWD, STDERR_LOG, CLAUDE_TURN_TIMEOUT_MS, CONTEXT_CYCLE_THRESHOLD_TOKENS, CLAUDE_MODEL, BUSY_FILE } from "./config.js";
 import { getSessionId, saveSessionId } from "./session.js";
 import { getHistory, appendHistory } from "./history.js";
 import { looksLikeRateLimitText, parseResetsAtFromText, normalizeResetsAt } from "./rateLimit.js";
 import { logTurn } from "./turnLog.js";
+import { clearBusy, markBusy } from "./busy.js";
 
 interface ClaudeResult {
   result: string;
@@ -129,6 +130,8 @@ export class ClaudeProcess {
     this.expectingResponse = false;
     this.unsolicitedText = "";
     this.firstBlockSeen = false;
+    // A previous process may have died mid-turn and left the marker behind.
+    clearBusy(BUSY_FILE);
     this.rl = createInterface({ input: proc.stdout! });
     this.rl.on("line", (line) => {
       if (this.proc === proc) this.onLine(line);
@@ -139,6 +142,7 @@ export class ClaudeProcess {
   }
 
   private onExit(): void {
+    clearBusy(BUSY_FILE);
     const waiter = this.waiters.shift();
     if (waiter) waiter(null);
   }
@@ -190,6 +194,7 @@ export class ClaudeProcess {
       return;
     }
     if (obj.type === "assistant") {
+      markBusy(BUSY_FILE);
       const blocks = obj.message?.content ?? [];
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
       if (text && text !== this.unsolicitedText) {
@@ -206,6 +211,7 @@ export class ClaudeProcess {
       }
     }
     if (obj.type === "result") {
+      clearBusy(BUSY_FILE);
       // `obj.result` is sometimes non-string too (observed in practice) — in that
       // case nothing gets broadcast (the earlier `assistant` block already went out
       // live), but for the history write the last streamed `assistant` text
@@ -279,10 +285,12 @@ export class ClaudeProcess {
   async send(promptText: string, timeoutMs = CLAUDE_TURN_TIMEOUT_MS): Promise<ClaudeResult> {
     if (!this.proc) throw new Error("claude proces není nastartovaný");
     this.expectingResponse = true;
+    markBusy(BUSY_FILE);
     try {
       return await this.sendAndAwaitResult(promptText, timeoutMs);
     } finally {
       this.expectingResponse = false;
+      clearBusy(BUSY_FILE);
     }
   }
 
