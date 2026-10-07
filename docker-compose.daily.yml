@@ -42,11 +42,14 @@ services:
       # samostatná budoucí položka, viz TASKS.md.
       - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
       - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
-      # Whole ~/.claude as a directory mount (rw): a single-file mount of
+      # Whole ~/.claude as a READ-ONLY directory mount: a single-file mount of
       # .credentials.json kept the stale expired file after a token refresh on the
-      # host (tmp+rename = new inode) -> 401 in the container. Also covers the
-      # sessions/ registry. Hardcoded path, not ${HOME}.
-      - /home/agent/.claude:/home/agent/.claude
+      # host (tmp+rename = new inode) -> 401 in the container. The directory always
+      # shows the current file. Read-only so containers never refresh/rotate the
+      # token themselves (race with host) and cannot alter host settings/hooks.
+      # The sessions/ registry is a nested rw mount on top. Hardcoded path, not ${HOME}.
+      - /home/agent/.claude:/home/agent/.claude:ro
+      - /home/agent/.claude/sessions:/home/agent/.claude/sessions
       - /home/agent/.claude.json:/home/agent/.claude.json:ro
       - /tmp/cc-socks:/tmp/cc-socks
     restart: "no"
