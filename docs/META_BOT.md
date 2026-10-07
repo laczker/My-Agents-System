@@ -443,6 +443,14 @@ mají `pid: host` a rw adresářové mounty `~/.claude/sessions` a `/tmp/cc-sock
 jednorázovým kontejnerem ve `stream-json` režimu (`claude -p "text"` se do registru
 nezapisuje); dosud jen směr host → kontejner.
 
+*Ověření 7.10. (read-only, bez posílání zpráv):* `daily-bots` i `project-bots` vidí
+stejný registr `~/.claude/sessions` (živé PID hostu díky `pid: host`) i `/tmp/cc-socks`;
+holé `connect()` na sokety uspělo daily → project, project → daily i kontejner → host
+(devbot). Soubory v `sessions/` po zabitých procesech zůstávají (stale, PID už neexistuje) —
+neškodné, ale `ListAgents` je může zobrazovat. Nezávisle neověřeno: skutečné doručení
+`SendMessage` a chování při rozdílném `pidDomain` (host má v doméně `machine-id`,
+kontejnery ne, protože tam `/etc/machine-id` není) — vyžaduje jeden živý test.
+
 **Iterace 10 — `trener` do `daily-bots`:** `trener` přešel z hostu do `daily-bots`
 (6 profilů). Compose mountuje `.env.trener` (ro) a `personal/trener`, `start-daily.sh`
 a `DAILY_PROFILES` ve `watchdog.sh` obsahují `trener`, hostový `pgrep`/`nohup` blok je
