@@ -19,8 +19,9 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    kontejner → host (devbot). **Neověřeno:** skutečné doručení zprávy (nesmí se
    posílat do botích chatů) a zda `SendMessage` akceptuje rozdílný `pidDomain`
    (host `linux:<machine-id>:pid:[ns]` vs. kontejnery `linux::pid:[ns]`, v
-   kontejneru chybí `/etc/machine-id`). Ověřit jednou živým `SendMessage`
-   z kontejneru na devbota (domluvit s uživatelem). Dále: postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
+   kontejneru chybí `/etc/machine-id`). **Ověřeno 7.10. živě:** `SendMessage`
+   z `joby` (kontejner `daily-bots`) na devbota (host) doručen, rozdílný `pidDomain`
+   nevadí; směr host → kontejner fungoval také. Zbývá: postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
    na hostu); po každém worktree ověřit `git merge-base HEAD main`.
 6. **Sebe-restart devbota může useknout vlastní odpověď** — čekat na zápis tahu
    do `chat_history.txt`, po restartu navázat. Velikost: M.
