@@ -28,9 +28,20 @@ send() {
         set +a
         [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] || exit 1
         curl -sS -m 20 -f -o /dev/null -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$2"
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID%%,*}" --data-urlencode "text=$2"
     ) >> "$LOG" 2>&1
 }
+
+# send_any <text> <profile...>: first profile whose Telegram send succeeds wins
+send_any() {
+    local text=$1 p; shift
+    for p in "$@"; do send "$p" "$text" && return 0; done
+    return 1
+}
+
+# Single instance (the watchdog runs this detached, a slow Telegram call must not overlap).
+exec 9>"${AUTH_WATCH_LOCK:-/tmp/auth_watch.lock}"
+flock -n 9 || exit 0
 
 affected=""
 for profile in $(cat "$ROOT/daily-profiles.txt" 2>/dev/null) fbalbums devbot; do
@@ -41,15 +52,22 @@ for profile in $(cat "$ROOT/daily-profiles.txt" 2>/dev/null) fbalbums devbot; do
 done
 affected=${affected# }
 
-if [ -n "$affected" ] && [ ! -f "$STATE" ]; then
-    # Create the state only after a successful send, so a failed send is retried next minute.
-    if send "${affected%% *}" "🔐 Claude autentizace nefunguje (OAuth) u botů: $affected. Procesy běží, nic jsem nerestartoval — kontejnery mají credentials jen pro čtení, obnovit je musí host (claude login / otevřít claude na hostu). Další upozornění přijde až po obnovení."; then
-        echo "$affected" > "$STATE"
-        log "alert sent for: $affected"
+prev=$(cat "$STATE" 2>/dev/null)
+if [ -n "$affected" ]; then
+    # Alert when a bot not yet announced in this outage appears (the first one, or a later one).
+    # State is written only after a successful send, so a failed send is retried next minute.
+    new=0
+    for p in $affected; do case " $prev " in *" $p "*) ;; *) new=1 ;; esac; done
+    if [ "$new" = 1 ]; then
+        # shellcheck disable=SC2086
+        if send_any "🔐 Claude autentizace nefunguje (OAuth) u botů: $affected. Procesy běží, nic jsem nerestartoval — kontejnery mají credentials jen pro čtení, obnovit je musí host (claude login / otevřít claude na hostu). Další upozornění přijde až po obnovení." $affected; then
+            echo "$prev $affected" | tr ' ' '\n' | sort -u | grep . | tr '\n' ' ' | sed 's/ $//' > "$STATE"
+            log "alert sent for: $affected"
+        fi
     fi
-elif [ -z "$affected" ] && [ -f "$STATE" ]; then
-    prev=$(cat "$STATE")
-    if send "${prev%% *}" "✅ Claude autentizace funguje zase (dříve postihnuto: $prev)."; then
+elif [ -n "$prev" ]; then
+    # shellcheck disable=SC2086
+    if send_any "✅ Claude autentizace funguje zase (dříve postihnuto: $prev)." $prev; then
         rm -f "$STATE"
         log "recovery notice sent (was: $prev)"
     fi

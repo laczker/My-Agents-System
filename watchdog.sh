@@ -40,7 +40,8 @@ throttle_start() {
 /home/agent/agent-system/run_bot_crons.sh >> /home/agent/agent-system/watchdog.log 2>&1
 
 # OAuth outage detection (alert only, never restarts; see auth_watch.sh).
-/home/agent/agent-system/auth_watch.sh
+# Detached so a slow Telegram call can't delay the restart checks below.
+/home/agent/agent-system/auth_watch.sh > /dev/null 2>&1 < /dev/null &
 
 cd /home/agent/agent-system/bridge-ts || exit 1
 

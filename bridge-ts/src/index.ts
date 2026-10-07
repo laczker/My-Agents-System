@@ -174,10 +174,11 @@ async function processQueue(): Promise<void> {
         // work for any of them.
         return;
       }
+      // Any non-auth outcome (success or a plain error) proves Claude auth works again.
+      clearAuthError();
       if (outcome.kind === "error") {
         sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId, job.messageId);
       } else {
-        clearAuthError();
         appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
         sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId, job.messageId);
       }

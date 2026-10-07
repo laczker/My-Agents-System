@@ -471,7 +471,7 @@ nemít funkční auth (credentials v kontejnerech jsou `:ro`, obnovuje je jen ho
 při `auth_error` zapíše `personal/<bot>/auth_error_ts.txt` (po dalším úspěšném tahu ho smaže);
 `watchdog.sh` každou minutu volá `auth_watch.sh`, který marker čte (marker starší než
 `~/.claude/.credentials.json` se ignoruje). Při přechodu "žádný bot postižen" -> "někdo postižen" pošle
-JEDNO Telegram upozornění (přes token prvního postiženého bota, stav v `/tmp/auth_watch_state`),
+JEDNO Telegram upozornění (přes token prvního postiženého bota s funkčním tokenem, stav v `/tmp/auth_watch_state`; další upozornění jen když přibude dosud neoznámený bot; běží odpojeně od watchdogu pod `flock`),
 při návratu jedno oznámení o obnově. Nic nerestartuje. Omezení: výpadek odhalí jen bot, který
 zpracovává úkol (žádná aktivní sonda); marker se do nasazení nového `bridge-ts` nezapisuje.
 

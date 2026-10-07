@@ -18,9 +18,18 @@ export function startHeartbeatLoop(): NodeJS.Timeout {
 // Marker for `auth_watch.sh` (run by watchdog.sh): written on every `auth_error`, removed on the
 // next successful turn. Presence means "this bot's last Claude call failed on auth".
 export function markAuthError(): void {
-  writeFileSync(AUTH_ERROR_FILE, JSON.stringify({ ts: Date.now(), iso: new Date().toISOString() }));
+  // Best effort: a failed marker write must never break queue processing.
+  try {
+    writeFileSync(AUTH_ERROR_FILE, JSON.stringify({ ts: Date.now(), iso: new Date().toISOString() }));
+  } catch (err) {
+    console.error("markAuthError failed:", err);
+  }
 }
 
 export function clearAuthError(): void {
-  rmSync(AUTH_ERROR_FILE, { force: true });
+  try {
+    rmSync(AUTH_ERROR_FILE, { force: true });
+  } catch (err) {
+    console.error("clearAuthError failed:", err);
+  }
 }

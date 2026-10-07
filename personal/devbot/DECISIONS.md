@@ -347,8 +347,8 @@ for that too (up to the cap).
 
 ## Watchdog iterace B: detekce OAuth výpadku přes marker soubor
 
-**Decision:** `bridge-ts` zapisuje `personal/<bot>/auth_error_ts.txt` při `auth_error` a maže ho
-po úspěšném tahu. Nový `auth_watch.sh` (volaný z `watchdog.sh`) marker čte a pošle jedno
+**Decision:** `bridge-ts` zapisuje `personal/<bot>/auth_error_ts.txt` při `auth_error` a maže ho při jakémkoli ne-auth výsledku (úspěch i běžná chyba),
+Nový `auth_watch.sh` (volaný z `watchdog.sh`) marker čte a pošle jedno
 Telegram upozornění na výpadek a jedno na obnovu (stav v `/tmp/auth_watch_state`, přechod
 prázdná/neprázdná množina postižených botů). Marker starší než `~/.claude/.credentials.json`
 se bere jako obnovený. Nic se automaticky nerestartuje.
