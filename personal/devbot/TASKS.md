@@ -55,3 +55,5 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
 - OAuth iterace A: aktivní upozornění při `auth_error` místo tichého doručení; rate-limit timeout fallback v `bridge-ts`.
 - `outbox.ts` zahazuje trvale nedoručitelné zprávy (400/403) místo blokace fronty.
 - Cron `watchdog.sh` vypnutý při ručním restartu → 409 Conflict (30.9.): konvence zapsaná v `DECISIONS.md`.
+
+- [x] Per-bot `cron.txt` (iter. 14, `run_bot_crons.sh`) — bots schedule durable jobs without the system crontab. Open: optional hash allowlist if the host-code-execution risk (container bot -> host script) should be gated.
