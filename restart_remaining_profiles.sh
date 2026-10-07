@@ -23,9 +23,9 @@
 # cron-started process instead of checking a PID this script launched
 # itself.
 #
-# NOTE (TASKS.md item 11, deliberately left as is): processes are stopped
-# 3s apart, but the restart burst is done by watchdog.sh in one cron tick,
-# so real batching would need a watchdog change. Also: the
+# NOTE (TASKS.md item 11): processes are stopped 3s apart, and watchdog.sh now
+# staggers the restart burst itself (max 2 starts per tick, see throttle_start).
+# Also (unchanged): the
 # cron watchdog is still disabled for the whole stop-all loop across all 7
 # profiles (tens of seconds), not just per profile. Shrinking that further
 # would mean restructuring the loop to disable/stop/re-enable per profile,
@@ -139,7 +139,11 @@ stop_profile() {
   fi
 }
 
-stop_profile "assistant" 'src/index\.ts$'
+# Leading space is required: the assistant has no profile argument, so a bare
+# 'src/index\.ts$' also matches the dashboard and zpravodaj webapp
+# (".../dashboard/src/index.ts"). The bot's wrappers/node process all have the
+# relative path "src/index.ts" preceded by a space (npm exec/sh -c/tsx/node loader).
+stop_profile "assistant" ' src/index\.ts$'
 sleep 3
 stop_profile "zpravodaj" 'src/index\.ts zpravodaj$'
 sleep 3
