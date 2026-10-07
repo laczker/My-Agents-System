@@ -281,3 +281,22 @@ dokumenty podle svého `CLAUDE.md` udržuje. Bez pointer souboru/symlinku — v 
 stejně nebyl namountovaný.
 
 **Date:** 2026-10-07
+
+## Retrospektiva dockerizace (7.10.2026)
+
+**Přínos:** OOM izolace (`mem_limit` daily 1536m / project 512m), rychlý
+restart-on-crash přes `docker compose`, jedna šablona pro nové boty. Aktuálně
+daily-bots ~835 MiB, project-bots ~173 MiB.
+
+**Náklady:** `~/.claude.json` single-file mount se po změně na hostu (schválení
+MCP, OAuth) rozchází s kontejnerem a chce `--force-recreate`; `start-daily.sh` je
+COPY v image (změna chce `--build`); `claude -p` cron skripty musí běžet na hostu
+(per-bot `cron.txt` přes `watchdog.sh`), takže kontejner jich část nepokryje; každá
+změna sdíleného kódu restartuje všechny boty v kontejneru; opakované incidenty
+(chybějící `procps`, stale credentials inode, sirotčí kontejner).
+
+**Stav:** kontejnery zůstávají (nic nemažeme bez schválení). Rozhodnutí o
+případném návratu na host je na uživateli; další dockerizační práce (devbot do
+kontejneru, TASKS č. 9) pozastavena.
+
+**Date:** 2026-10-07
