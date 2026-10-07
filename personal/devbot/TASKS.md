@@ -21,8 +21,8 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    (host `linux:<machine-id>:pid:[ns]` vs. kontejnery `linux::pid:[ns]`, v
    kontejneru chybí `/etc/machine-id`). **Ověřeno 7.10. živě:** `SendMessage`
    z `joby` (kontejner `daily-bots`) na devbota (host) doručen, rozdílný `pidDomain`
-   nevadí; směr host → kontejner fungoval také. Zbývá: postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
-   na hostu); po každém worktree ověřit `git merge-base HEAD main`.
+   nevadí; směr host → kontejner fungoval také. **Hotovo 7.10.:** postup obnovy OAuth tokenu zdokumentován v `META_BOT.md`
+   (`claude /login` na hostu, rotace `setup-token` v crontabu); po každém worktree ověřit `git merge-base HEAD main`.
 6. **Sebe-restart devbota může useknout vlastní odpověď** — čekat na zápis tahu
    do `chat_history.txt`, po restartu navázat. Velikost: M.
    **Hotovo:** `restart_devbot.sh` čeká na prázdnou frontu + outbox + nepřítomnost

@@ -489,6 +489,26 @@ JEDNO Telegram upozornění (přes token prvního postiženého bota s funkční
 při návratu jedno oznámení o obnově. Nic nerestartuje. Omezení: výpadek odhalí jen bot, který
 zpracovává úkol (žádná aktivní sonda); marker se do nasazení nového `bridge-ts` nezapisuje.
 
+**Obnova OAuth tokenu (postup):** existují dva nezávislé zdroje auth, obnovují se různě.
+1. *Interaktivní login (`~/.claude/.credentials.json`)* — používají ho Claude CLI v kontejnerech
+   `daily-bots`/`project-bots` (mount `~/.claude` jako read-only adresář, od iterace 11). Při výpadku
+   (Telegram upozornění z `auth_watch.sh`, nebo `OAuth session expired` / 401) stačí na HOSTU
+   `claude /login`. Nový soubor je v kontejnerech vidět hned, nic se nerestartuje ani nerecreatuje;
+   po úspěšném tahu `bridge-ts` smaže `auth_error_ts.txt` a `auth_watch.sh` pošle oznámení o obnově.
+   Kontejnery token samy neobnovují (`:ro`, žádný race s hostem).
+2. *Dlouhodobý `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`)* — platí cca rok (připomínka v
+   `personal/devbot/TASKS.md`, kolem 15.9.2027) a nese ho jen proměnná v uživatelském crontabu
+   (`CLAUDE_CODE_OAUTH_TOKEN=...` na řádku nad úlohami). Dědí ho `watchdog.sh` (cron) a z něj hostové
+   procesy (devbot, dashboard) i skripty spouštěné cronem (digesty, `daily_job_search.sh`,
+   `nightly_cleanup.sh`, `checkin.sh`). Neleží v žádném `.env*` a compose soubory ho do kontejnerů
+   nepředávají (kontejnery jedou z bodu 1). Rotace: `claude setup-token` na hostu, novou hodnotu
+   vložit do crontabu (`crontab -e`, změna crontabu = výslovné schválení uživatele), a aktualizovat
+   `crontab_backup.txt` (generuje se z `crontab -l`, je v `.gitignore`). Hostové procesy převezmou
+   token až po restartu přes cron `watchdog.sh` (kill, nikdy ruční start, protože ruční shell nemá
+   token v env). Pokud by token někdy putoval i do `.env*` nebo `environment:` v compose, je nutné
+   ho tam změnit také a kontejner recreatovat (`up -d`, nikdy `--remove-orphans`, fronty prázdné).
+   Skutečnou hodnotu tokenu nikdy nepsat do repa, docs ani chatu.
+
 **Busy marker (`busy_ts.txt`):** `bridge-ts` zapisuje `personal/<bot>/busy_ts.txt` (JSON s `ts`) po celou dobu
 libovolného tahu, i cross-session/unsolicited (`SendMessage`, cron wakeup), který není v `job_queue_ts.json`;
 maže ho na konci tahu, při chybě/timeoutu, při exitu procesu a při startu nového. `restart_devbot.sh` čeká,
