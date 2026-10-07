@@ -195,6 +195,10 @@ export class ClaudeProcess {
     } catch {
       return;
     }
+    // Events of a subagent's own conversation (Agent tool) carry `parent_tool_use_id`.
+    // Their text is the subagent's working notes/report, not the bot's reply, so it must
+    // neither be broadcast nor mark the bot busy.
+    if (obj.parent_tool_use_id) return;
     if (obj.type === "assistant") {
       this.busy.set("unsolicited", true);
       const blocks = obj.message?.content ?? [];
@@ -342,7 +346,7 @@ export class ClaudeProcess {
 
       if (obj.session_id) saveSessionId(obj.session_id);
 
-      if (obj.type === "assistant") {
+      if (obj.type === "assistant" && !obj.parent_tool_use_id) {
         const blocks = obj.message?.content ?? [];
         const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
         if (text) lastAssistantText = text;
