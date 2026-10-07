@@ -460,3 +460,5 @@ timeout fallback) se od založení `devbot` (7.9.) zapisují do
 `personal/devbot/DECISIONS.md` místo sem.
 
 > Note (iter. 10): `start-daily.sh` is baked into the daily image; after editing it run `up -d --build --force-recreate`.
+
+> Note (iter. 11): `~/.claude` is now mounted as a whole directory, read-only, with `sessions/` as a nested rw mount, in both compose files (instead of single-file `.credentials.json` + `sessions/`). A token refresh on the host no longer leaves containers with a stale inode (401). Containers still cannot refresh the token themselves. Needs `up -d --force-recreate` to take effect. `~/.claude.json` is still a single-file ro mount (same inode caveat, not yet hit).
