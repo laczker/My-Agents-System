@@ -57,4 +57,4 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
 - Cron `watchdog.sh` vypnutý při ručním restartu → 409 Conflict (30.9.): konvence zapsaná v `DECISIONS.md`.
 
 - [x] Per-bot `cron.txt` (iter. 14, `run_bot_crons.sh`) — bots schedule durable jobs without the system crontab. Open: optional hash allowlist if the host-code-execution risk (container bot -> host script) should be gated.
-- [ ] Busy flag from `bridge-ts` (e.g. marker file while a turn is running, incl. cross-session `SendMessage` turns) so `restart_devbot.sh` doesn't cut such a turn (gap documented in `DECISIONS.md`, item 6). Waiting for user go-ahead.
+- [x] Busy marker `busy_ts.txt` in bridge-ts (also for unsolicited/cross-session turns) + `restart_devbot.sh` waits for it (branch `busy-marker`).

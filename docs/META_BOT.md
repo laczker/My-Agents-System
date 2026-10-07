@@ -475,6 +475,11 @@ JEDNO Telegram upozornění (přes token prvního postiženého bota s funkční
 při návratu jedno oznámení o obnově. Nic nerestartuje. Omezení: výpadek odhalí jen bot, který
 zpracovává úkol (žádná aktivní sonda); marker se do nasazení nového `bridge-ts` nezapisuje.
 
+**Busy marker (`busy_ts.txt`):** `bridge-ts` zapisuje `personal/<bot>/busy_ts.txt` (JSON s `ts`) po celou dobu
+libovolného tahu, i cross-session/unsolicited (`SendMessage`, cron wakeup), který není v `job_queue_ts.json`;
+maže ho na konci tahu, při chybě/timeoutu, při exitu procesu a při startu nového. `restart_devbot.sh` čeká,
+až marker zmizí (marker starší než `BUSY_STALE_SEC`, default 1800 s, ignoruje jako pozůstatek pádu).
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním

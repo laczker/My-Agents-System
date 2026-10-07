@@ -2,7 +2,7 @@
 # Restart devbot's own bridge-ts profile to deploy a merged change
 # (cron watchdog must be disabled first to avoid a 409 Conflict race with
 # it restarting the same profile; before the kill we wait until the in-flight
-# turn has finished: job queue empty and outbox empty -- see "Quiesce" below).
+# turn has finished: job queue empty, outbox empty and no busy marker -- see "Quiesce" below).
 #
 # Incident 2.10.: this script used to run as a plain foreground child of
 # the very `claude -p` process it kills in the "stop old process" step
@@ -129,10 +129,27 @@ log "restart sequence starting (pid $$)"
 # is lost, only possibly delayed.
 QUEUE_FILE=/home/agent/agent-system/personal/devbot/job_queue_ts.json
 OUTBOX_FILE=/home/agent/agent-system/personal/devbot/outbox_ts.json
+BUSY_FILE=/home/agent/agent-system/personal/devbot/busy_ts.txt
+# bridge-ts writes BUSY_FILE for the whole duration of any turn, including
+# unsolicited ones (cross-session SendMessage, cron wakeups) that never touch the
+# queue. A marker older than BUSY_STALE_SEC is a leftover from a crash: ignored.
+BUSY_STALE_SEC=${BUSY_STALE_SEC:-1800}
 QUIESCE_TIMEOUT=${QUIESCE_TIMEOUT:-600}
 QUIESCE_MIN_WAIT=${QUIESCE_MIN_WAIT:-5}
 
+is_busy() {
+  [ -f "$BUSY_FILE" ] || return 1
+  local ts now_ms
+  ts=$(sed -n 's/.*"ts"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$BUSY_FILE" 2>/dev/null)
+  # Unparsable marker: treat as busy (the stale cap cannot be evaluated, the
+  # QUIESCE_TIMEOUT still bounds the wait).
+  [ -n "$ts" ] || return 0
+  now_ms=$(( $(date +%s%N) / 1000000 ))
+  [ $(( (now_ms - ts) / 1000 )) -lt "$BUSY_STALE_SEC" ]
+}
+
 is_quiet() {
+  is_busy && return 1
   # Missing file counts as empty; unreadable/unparsable content does not.
   if [ -f "$QUEUE_FILE" ]; then
     # A job parked behind a rate-limit wait never finishes by itself: treat as
@@ -158,10 +175,10 @@ while [ $((SECONDS - q_start)) -lt "$QUIESCE_TIMEOUT" ]; do
   sleep 2
 done
 if [ "$q_quiet" -ge 2 ]; then
-  log "devbot quiescent (queue and outbox empty) after $((SECONDS - q_start + QUIESCE_MIN_WAIT))s"
+  log "devbot quiescent (queue, outbox empty, no busy marker) after $((SECONDS - q_start + QUIESCE_MIN_WAIT))s"
 else
   log "WARNING: devbot not quiescent after ${QUIESCE_TIMEOUT}s, restarting anyway (queued job is retried, outbox flushed on startup)"
-  send_alert "⚠️ restart_devbot.sh: devbot do ${QUIESCE_TIMEOUT}s neutichl (fronta/outbox neprázdné), restartuji i tak; rozpracovaný úkol se po startu zopakuje."
+  send_alert "⚠️ restart_devbot.sh: devbot do ${QUIESCE_TIMEOUT}s neutichl (fronta/outbox neprázdné nebo tah běží), restartuji i tak; rozpracovaný úkol se po startu zopakuje."
 fi
 
 if ! crontab -l > "${CRON_BACKUP}.new" 2>/dev/null; then
