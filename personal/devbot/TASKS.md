@@ -5,91 +5,43 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
 
 ## Otevřené (podle priority)
 
-1. **Iterace 11b: `trener` do dashboardu** — `personal/dashboard/src/config.ts`
-   nemá `trener` vůbec (ověřeno: 0 výskytů), takže v dashboardu chybí heartbeat
-   i restart tlačítko. Přidat s `inContainer: "daily-bots"`. Velikost: S. Restart
-   dashboardu = potřeba schválit (dotčený běžící proces).
-2. **`~/.claude.json` je pořád single-file mount (inode)** — oba compose soubory
+1. **`~/.claude.json` je pořád single-file mount (inode)** — oba compose soubory
    mountují `/home/agent/.claude.json:ro` jako soubor; po přepsání na hostu
-   (tmp+rename) kontejner vidí starý obsah (projevilo se u Rohlík MCP schválení,
-   nutný `--force-recreate`). Řešení: symlink/přesun do adresáře, nebo
-   `CLAUDE_CONFIG_DIR`. Nutný spec (dotýká se auth). Velikost: M. Recreate
-   kontejnerů = schválení restartu.
-3. **`mem_limit`/restart limit pro `daily-bots`** — oba kontejnery mají
-   `restart: "no"` a žádný `mem_limit` (ověřeno grepem); 6 botů v jednom
-   kontejneru na ~3,7 GB hostu = OOM jednoho shodí všechny. Navrhnout limit +
-   případně `deploy.resources`; restart řeší watchdog. Velikost: S. Recreate =
-   schválení.
-4. **Sirotčí kontejner `agent-system-project-bots-1`** — oba compose soubory
-   sdílí project name `agent-system` (žádný `name:`), takže `compose up` jednoho
-   souboru hlásí druhý jako orphan a `--remove-orphans` by ho SMAZAL. Oprava:
-   `name:` v každém souboru (např. `agent-system-daily`/`-project`), ale to
-   přejmenuje kontejnery = recreate obou. Velikost: S. VYŽADUJE schválení
-   (zásah do běžících fbalbums + denních botů); nikdy `--remove-orphans`.
-5. **Přesun devbota do kontejneru** — devbot jako jediný pořád na hostu (trener
-   už v `daily-bots`). Problém: nemůže restartovat sám sebe a pracuje nad
-   `agent-system` repem + worktrees + docker socketem. Potřeba spec (vlastní
-   kontejner? Docker socket mount?, kdo ho restartuje). Velikost: L. Schválení
-   specu i restartu.
-6. **Sladit pin `claude` CLI v `Dockerfile.daily`/`Dockerfile.project`** —
-   pin `2.1.280`, host má `2.1.291` (drift se opakuje). Bump vyžaduje rebuild +
-   recreate. Zvážit build arg/jeden zdroj verze. Velikost: S. Recreate =
-   schválení.
-7. **Seznam kontejnerových profilů na 3 místech** — `DAILY_PROFILES` ve
-   `watchdog.sh` (ř. 37), `start-daily.sh` default a `inContainer` v dashboard
-   `config.ts` (viz 1). Jeden zdroj pravdy. Velikost: S–M. Restart dashboardu =
-   schválení.
-8. **Adresářový mount pro `META_BOT.md`/`ARCHITEKTURA.md`** — dnes jen `:ro`
+   (tmp+rename) kontejner vidí starý obsah. Řešení: adresářový mount /
+   `CLAUDE_CONFIG_DIR`. Dotýká se auth. Velikost: M. Nasazení = recreate.
+2. **Restart skripty / watchdog** — dávkování startu botů ve `watchdog.sh` (po
+   zapnutí cronu nahodí všechny najednou = paměťová špička, možná příčina pádu
+   1.10.); starý vzor `src/index\.ts$` pro `assistant` v
+   `restart_remaining_profiles.sh` zasáhne i dashboard a webapp zpravodaje.
+   Velikost: S.
+3. **Adresářový mount pro `META_BOT.md`/`ARCHITEKTURA.md`** — dnes jen `:ro`
    single-file mount, kontejnerový assistant je nemůže upravovat. Přesun do
-   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. Bez
-   restartu botů až po recreate kontejnerů.
-9. **`META_BOT.md` nezachycuje iteraci 11** (`~/.claude` jako ro adresářový
-   mount; zmíněna jen iterace 10) — doplnit spolu s dalším zásahem do dokumentu.
-   Velikost: XS, bez restartu.
-10. **`restart_devbot.sh` self-detach `$0`** — `setsid "$0"` pořád
-    selže tiše, když je skript volán bez `/` (`bash restart_devbot.sh`);
-    oprava `readlink -f "$0"`. Totéž ověřit u `restart_remaining_profiles.sh`.
-    Velikost: XS. Nevyžaduje restart (jen skript).
-11. **Restart skripty — další drobnosti** — `pgrep -f "src/index\.ts devbot"` je
-    substring match na celý cmdline; `restart_remaining_profiles.sh` vypíná cron
-    pro všech profilů najednou (ne per-profil) a hromadný restart 7 procesů je
-    paměťová špička (možná příčina pádu devbota 1.10.). Dávkovat. Velikost: S.
-    Schválení při ostrém testu.
-12. **Sebe-restart devbota může useknout vlastní odpověď** — čekat na zápis tahu
-    do `chat_history.txt` místo pevného zpoždění; po restartu navázat a aktivně
-    oznámit. Související: po restartu devbot nenavazuje na rozdělanou práci.
-    Potřeba spec. Velikost: M.
-13. **Sjednotit chování agentů / jazyk a frekvence mezikroků** — recidiva
-    anglických a samostatných mezikroků i po `firstBlockSeen` fixu (5.10.).
-    Audit `CLAUDE.md` profilů proběhl/zadán 1.10.; výstup má být šablona pro
-    zakládání nových botů. Uživatel 5.10. řekl "teď neřešit" — čeká na pokyn.
-    Velikost: M–L.
-14. **Watchdog iterace B: "běží, ale auth nefunguje"** — process-level detekce
-    OAuth výpadku (EOF bez `result` eventu textová detekce nezachytí). Pozor:
-    po iteraci 11 jsou creds v kontejneru read-only, takže refresh dělá jen
-    host. Velikost: M.
-15. **Telegram UX, druhá vlna** — `reply_parameters`, `setMessageReaction`,
-    živá editace (`editMessageText`). Typing + Markdown hotovo. Velikost: M,
-    sdílený kód všech botů.
-16. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
-    netrimuje (zápisy zrychlené unsolicited tahy). Velikost: S–M, sdílený kód
-    (restart všech botů).
-17. **Ověření SendMessage host → kontejner (iterace 9)** — doručení k `nakup-ec`
-    drženo kvůli permission módu druhé strany; registr + sokety fungují.
-    Zbývá kontejner → kontejner. Velikost: XS.
-18. **`unescapeDelimiter` a zero-width space** — okrajový případ; řešit až
-    případnou změnou formátu na JSON-lines. Nízká priorita.
-19. **Proces: `EnterWorktree` větví z `origin/main`** (pozadu za lokálním `main`)
-    — po každém worktree ověřit `git merge-base HEAD main` a rebasovat.
-    Případně pushnout `origin`. Velikost: XS.
-20. **Obnova OAuth tokenu — postup** — po iteraci 11 stačí `claude /login` na
-    hostu (adresářový mount vidí nový soubor), `compose restart` by neměl být
-    nutný; ověřit při příštím vypršení a upravit postup v dokumentaci.
-21. **Připomínka: ověřit/obnovit `CLAUDE_CODE_OAUTH_TOKEN` kolem 15.9.2027**
-    (setup-token, ~1 rok, nelze hlídat souborově).
+   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M.
+4. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
+   netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M.
+5. **Drobnosti** — ověření SendMessage kontejner → kontejner (iterace 9);
+   postup obnovy OAuth tokenu v dokumentaci (po iteraci 11 stačí `claude /login`
+   na hostu); po každém worktree ověřit `git merge-base HEAD main`.
+6. **Sebe-restart devbota může useknout vlastní odpověď** — čekat na zápis tahu
+   do `chat_history.txt`, po restartu navázat. Potřeba spec. Velikost: M.
+7. **Watchdog iterace B: "běží, ale auth nefunguje"** — process-level detekce
+   OAuth výpadku. Creds v kontejneru jsou read-only, refresh dělá jen host.
+   Velikost: M. Potřeba spec.
+8. **Telegram UX, druhá vlna** — `reply_parameters`, `setMessageReaction`,
+   `editMessageText`. Sdílený kód všech botů. Velikost: M.
+9. **Přesun devbota do kontejneru** — nemůže restartovat sám sebe, pracuje nad
+   repem + worktrees + docker socketem. Potřeba spec. Velikost: L.
+10. **Sjednotit chování agentů / jazyk a frekvence mezikroků** — uživatel
+    5.10. řekl "teď neřešit"; čeká na pokyn. Velikost: M–L.
+11. **`unescapeDelimiter` a zero-width space** — nízká priorita, řešit až se
+    změnou formátu na JSON-lines.
+12. **Bezpečnost: `crontab_backup.txt` je v gitu a obsahuje plaintext
+    `CLAUDE_CODE_OAUTH_TOKEN`** — gitignore / placeholder; vyžaduje schválení.
+13. **Připomínka: ověřit/obnovit `CLAUDE_CODE_OAUTH_TOKEN` kolem 15.9.2027.**
 
 ## Hotové (jeden řádek na položku)
 
+- Iterace 12 (7.10., `8e4952e`): `mem_limit` (daily 1536m, project 512m), pevné `name:`/`container_name` v compose (konec sirotčího kontejneru), jeden `ARG` verze `claude` CLI (2.1.291), `trener` v dashboardu, `daily-profiles.txt` jako jediný zdroj seznamu profilů, `readlink -f "$0"` a kotvy `pgrep` v restart skriptech, `META_BOT.md` doplněn o iteraci 11.
 - Docker pilot iterace 1–5: Dockerfile + compose pro denní skupinu, mounty, watchdog `docker compose` hlídání (neaktivní), Dockerfile + compose pro projektovou skupinu (fbalbums).
 - Iterace 3: `META_BOT.md`/`ARCHITEKTURA.md` do kontejneru jen `:ro` (inode; strukturální oprava zůstává otevřená, viz 8).
 - Iterace 6 (5.10.): canary cutover `nakup`; opraven kritický bug chybějící `procps` v `Dockerfile.daily` (watchdog každou minutu force-recreate).

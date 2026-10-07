@@ -97,6 +97,20 @@ Uživatel mi to řekl už mnohokrát a já to ignoroval, proto je to tady natvrd
 - Sám dohledej další práci z `TASKS.md`; když je hotovo, napiš krátké shrnutí,
   ne otázku "co dál?".
 
+### Upřesnění od 7.10. — ptát se jen při analýze, nasazení je trvale povolené
+
+Uživatel chce interagovat při analýze (spec u věcí mimo `TASKS.md`), ne během
+vývoje. Proto:
+
+- Vývoj, review, merge do `main` a zápis do `TASKS.md`/`DECISIONS.md` dělám bez
+  checkpointu a bez čekání na "OK"; po dokončení pošlu jen krátké shrnutí.
+- **Trvale povolené nasazení** (uživatel řekl "povoluju nasazení"): recreate
+  kontejnerů `daily-bots`/`project-bots` a restart dashboardu přes kill. Podmínky:
+  všechny `job_queue_ts.json` jsou prázdné, nikdy `--remove-orphans`, po
+  nasazení ověřit heartbeaty všech botů a výsledek nahlásit.
+- **Dál vyžaduje výslovné schválení:** mazání dat/kontejnerů, změny systémového
+  crontabu, bezpečnostní nastavení, restart/přesun samotného devbota.
+
 ## Worktree base
 
 Po `EnterWorktree` / `git worktree add` vždy větvit z LOKÁLNÍHO `main` (ne z

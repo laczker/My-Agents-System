@@ -243,3 +243,28 @@ moc overhead). Single-file bind mount drží starý inode po tmp+rename (zjišt�
 Otevřené následky viz `TASKS.md` (`.claude.json`, mem_limit, orphan, dashboard).
 
 **Date:** 2026-10-07
+
+## Iterace 12 — mem_limit, pevné názvy, jeden zdroj profilů (7.10.2026)
+
+**Rozhodnutí:** `mem_limit` 1536m (`daily-bots`, naměřeno ~745 MiB) a 512m
+(`project-bots`); compose soubory mají `name:` (`agent-system-daily`/`-project`)
+a `container_name`, takže compose nehlásí druhý kontejner jako orphan
+(`--remove-orphans` se nepoužívá). Seznam denních profilů je v
+`daily-profiles.txt` (čte `watchdog.sh`, `start-daily.sh`, dashboard; prázdný
+soubor = dashboard při startu spadne). Verze `claude` CLI je jeden `ARG`.
+
+**Why:** OOM izolace a konec sirotčího kontejneru; tři duplicitní seznamy
+profilů se rozcházely. Po změně názvu projektu musí následovat `docker rm -f`
+starých kontejnerů hned po mergi, jinak je watchdog bere jako "neběží".
+
+**Date:** 2026-10-07
+
+## Autonomie a nasazení (7.10.2026)
+
+**Rozhodnutí:** Uživatel interaguje při analýze/specu, ne při vývoji. Merge do
+`main` bez checkpointu; nasazení (recreate `daily-bots`/`project-bots`, restart
+dashboardu) trvale povoleno při prázdných frontách a s ověřením heartbeatů.
+Schválení zůstává u mazání dat/kontejnerů, crontabu, bezpečnosti a restartu
+samotného devbota. Zapsáno v `CLAUDE.md`.
+
+**Date:** 2026-10-07
