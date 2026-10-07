@@ -439,7 +439,7 @@ nezapisuje); dosud jen směr host → kontejner.
 a `DAILY_PROFILES` ve `watchdog.sh` obsahují `trener`, hostový `pgrep`/`nohup` blok je
 smazán (jinak by vznikly dva pollery na jednom tokenu, 409). `checkin.sh` (cron
 13:00/23:00) zůstává na hostu. Pád jen `trener` restartuje celý `daily-bots` (stejně
-jako u ostatních profilů). Dashboard `trener` zatím nezobrazuje (není v `BOTS`).
+jako u ostatních profilů). (Dashboard `trener` přidán v iteraci 12, viz níž.)
 
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
@@ -458,6 +458,8 @@ Plný popis incidentů a jejich oprav (rate limit handling, race condition v
 ne náhrada. Novější `bridge-ts` změny (OAuth fallback, Telegram UX, rate-limit
 timeout fallback) se od založení `devbot` (7.9.) zapisují do
 `personal/devbot/DECISIONS.md` místo sem.
+
+> Note (iter. 12): dashboard now shows 7 bots (`trener` added to `BOTS` in `personal/dashboard/src/config.ts`). The daily-bots profile list lives in one file, `daily-profiles.txt` (repo root), read by `watchdog.sh`, `start-daily.sh` (via a ro mount `/daily-profiles.txt` in `docker-compose.daily.yml`) and the dashboard (sets `inContainer: "daily-bots"` at startup). Adding a daily bot = edit that file + `.env`/`personal/<bot>` mounts in compose + a `BOTS` entry. Rollout: restart the dashboard (reads the file at startup) and `up -d --build --force-recreate` for daily-bots (`start-daily.sh` changed, baked into the image).
 
 > Note (iter. 10): `start-daily.sh` is baked into the daily image; after editing it run `up -d --build --force-recreate`.
 

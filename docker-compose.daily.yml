@@ -1,8 +1,8 @@
 # Docker pilot (personal/devbot/CLAUDE.md) — skupina denních botů (assistant,
 # zpravodaj, mailista, joby, nakup, trener) v jednom kontejneru. Kontejner hlídá
 # watchdog.sh (compose ps + exec pgrep, viz META_BOT.md §4a). Všech 6 profilů běží
-# v kontejneru (iterace 6-8 a 10); start-daily.sh defaultuje na všech 6, takže
-# DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
+# v kontejneru (iterace 6-8 a 10); start-daily.sh čte seznam z daily-profiles.txt
+# (mount), DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
 # watchdogu i hostové procesy, takže hostový proces stejného profilu musí být
 # před cutoverem zastavený.
 services:
@@ -40,6 +40,8 @@ services:
       # `Edit` nástroj píše přes tmp+rename, takže zápis skončí na novém inode,
       # co bind mount vůbec nevidí). Skutečné rw řešení (adresářový mount) je
       # samostatná budoucí položka, viz TASKS.md.
+      # Profile list shared with watchdog.sh and the dashboard (read by start-daily.sh).
+      - ./daily-profiles.txt:/daily-profiles.txt:ro
       - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
       - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
       # Whole ~/.claude as a READ-ONLY directory mount: a single-file mount of
