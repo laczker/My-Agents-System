@@ -135,18 +135,20 @@ QUIESCE_MIN_WAIT=${QUIESCE_MIN_WAIT:-5}
 is_quiet() {
   # Missing file counts as empty; unreadable/unparsable content does not.
   if [ -f "$QUEUE_FILE" ]; then
-    tr -d ' \n' < "$QUEUE_FILE" | grep -q '"jobs":\[\]' || return 1
+    # A job parked behind a rate-limit wait never finishes by itself: treat as
+    # quiet (the new process replays it) instead of burning the whole timeout.
+    tr -d ' \t\r\n' < "$QUEUE_FILE" | grep -Eq '"jobs":\[\]|"rateLimitResumeAtMs":[0-9]' || return 1
   fi
   if [ -f "$OUTBOX_FILE" ]; then
-    [ "$(tr -d ' \n' < "$OUTBOX_FILE")" = "[]" ] || return 1
+    [ "$(tr -d ' \t\r\n' < "$OUTBOX_FILE")" = "[]" ] || return 1
   fi
   return 0
 }
 
 sleep "$QUIESCE_MIN_WAIT"
-q_elapsed=0
+q_start=$SECONDS
 q_quiet=0
-while [ "$q_elapsed" -lt "$QUIESCE_TIMEOUT" ]; do
+while [ $((SECONDS - q_start)) -lt "$QUIESCE_TIMEOUT" ]; do
   if is_quiet; then
     q_quiet=$((q_quiet + 1))
     [ "$q_quiet" -ge 2 ] && break
@@ -154,10 +156,9 @@ while [ "$q_elapsed" -lt "$QUIESCE_TIMEOUT" ]; do
     q_quiet=0
   fi
   sleep 2
-  q_elapsed=$((q_elapsed + 2))
 done
 if [ "$q_quiet" -ge 2 ]; then
-  log "devbot quiescent (queue and outbox empty) after $((q_elapsed + QUIESCE_MIN_WAIT))s"
+  log "devbot quiescent (queue and outbox empty) after $((SECONDS - q_start + QUIESCE_MIN_WAIT))s"
 else
   log "WARNING: devbot not quiescent after ${QUIESCE_TIMEOUT}s, restarting anyway (queued job is retried, outbox flushed on startup)"
   send_alert "⚠️ restart_devbot.sh: devbot do ${QUIESCE_TIMEOUT}s neutichl (fronta/outbox neprázdné), restartuji i tak; rozpracovaný úkol se po startu zopakuje."

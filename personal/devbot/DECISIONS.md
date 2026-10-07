@@ -341,7 +341,8 @@ from "other write"); an explicit bridge-ts "drain" signal/endpoint (larger
 diff, new IPC for one script). Fallback on timeout is safe: a job left in the
 queue is retried by the new process and the outbox is flushed on startup.
 Limits: unsolicited cross-session turns are not in the queue and are not
-awaited; with a user message queued behind the current one the script waits
+awaited (no busy signal exists for them); a job parked behind a rate-limit wait
+counts as quiet; with a user message queued behind the current one the script waits
 for that too (up to the cap).
 
 **Date:** 2026-10-07
