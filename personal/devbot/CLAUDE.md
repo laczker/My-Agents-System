@@ -97,6 +97,12 @@ Uživatel mi to řekl už mnohokrát a já to ignoroval, proto je to tady natvrd
 - Sám dohledej další práci z `TASKS.md`; když je hotovo, napiš krátké shrnutí,
   ne otázku "co dál?".
 
+## Worktree base
+
+Po `EnterWorktree` / `git worktree add` vždy větvit z LOKÁLNÍHO `main` (ne z
+`origin/main`, který bývá pozadu) a hned ověřit `git merge-base HEAD main`
+(musí být aktuální hlava lokálního `main`); jinak rebasovat.
+
 ## Principy
 
 Stejné jako `personal/assistant/CLAUDE.md` (human-in-the-loop, vysoká autonomie
