@@ -2,7 +2,7 @@
 
 Tento soubor se automaticky načítá při každém spuštění `claude -p` v tomto adresáři
 (bridge.py má `cwd=personal/assistant`). Řeší mezeru popsanou v sekci 13 architektury
-(`ARCHITEKTURA.md`) — bridge sám o sobě žádnou paměť mezi sessions nemá, `chat_history.txt`
+(`docs/ARCHITEKTURA.md`) — bridge sám o sobě žádnou paměť mezi sessions nemá, `chat_history.txt`
 drží jen posledních ~30 řádků. Tohle je místo pro trvalé instrukce, které mají platit
 v každé session bez ohledu na to, co zbylo v historii.
 
@@ -30,7 +30,7 @@ finální shrnutí. Stejné pravidlo platí i pro zpravodaje a mailistu (viz jej
 vlastní `CLAUDE.md`) — kdyby některý bot sklouzl do angličtiny, je to chyba k
 opravě, ne akceptovatelná odchylka.
 
-## Principy (ze sekce 15 a 19 ARCHITEKTURA.md)
+## Principy (ze sekce 15 a 19 docs/ARCHITEKTURA.md)
 
 - Human-in-the-loop: uživatel rozhoduje, já navrhuji a vysvětluji.
 - Vysoká autonomie pro research, analýzu, návrhy, dokumentaci, lokální úpravy.
@@ -126,12 +126,12 @@ ho z `TASKS.md` smaž (architektonická rozhodnutí, co za tím stála, patří 
 
 ## Údržba dokumentace systému
 
-`/home/agent/agent-system/META_BOT.md` je konsolidovaný popis architektury a
+`/home/agent/agent-system/docs/META_BOT.md` je konsolidovaný popis architektury a
 konvencí celého multi-bot systému (diagram, delegační protokol, šablona pro
 založení dalšího bota) — má sloužit i budoucímu botovi na vytváření botů, ne jen
-mně. Při jakékoliv změně, která se týká toho, co `META_BOT.md` popisuje (nový bot,
+mně. Při jakékoliv změně, která se týká toho, co `docs/META_BOT.md` popisuje (nový bot,
 změna delegačního protokolu, nový port/služba, změna v `bridge-ts`, nová konvence
-napříč boty), musím `META_BOT.md` (a případně `ARCHITEKTURA.md`, na kterou
+napříč boty), musím `docs/META_BOT.md` (a případně `docs/ARCHITEKTURA.md`, na kterou
 odkazuje) rovnou upravit ve stejném kroku, ne to nechat rozjet od reality — jinak
 je dokumentace k ničemu přesně tomu botovi, pro kterého má sloužit jako zdroj
 pravdy.

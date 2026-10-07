@@ -25,7 +25,7 @@ cd /home/agent/agent-system/bridge-ts || exit 1
 # kontejneru přímo):
 # 1) `docker compose ps` — pokud selže (daemon nedostupný), jen zalogovat a
 #    nic nerestartovat, ať se netváří, že profil spadl, když problém je jinde
-#    (stejná opatrnost jako u iterace 4, viz META_BOT.md §4a); pokud kontejner
+#    (stejná opatrnost jako u iterace 4, viz docs/META_BOT.md §4a); pokud kontejner
 #    neběží, normální `up -d`.
 # 2) teprve když kontejner běží, `exec` pgrep na konkrétní proces uvnitř za
 #    každý profil zvlášť — zachytí i pád jen jednoho z nich, co kontejner

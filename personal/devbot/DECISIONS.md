@@ -268,3 +268,16 @@ Schválení zůstává u mazání dat/kontejnerů, crontabu, bezpečnosti a rest
 samotného devbota. Zapsáno v `CLAUDE.md`.
 
 **Date:** 2026-10-07
+
+## Dokumenty do `docs/`, adresářový mount (iterace 13, supersedes iteraci 3)
+
+**Decision:** `META_BOT.md` a `ARCHITEKTURA.md` přesunuty do `docs/`; kontejnery mountují
+adresář `./docs` (denní skupina rw, projektová ro). Odkazy v `CLAUDE.md`/skriptech
+upraveny na `docs/...`; historické zápisy v `DECISIONS.md`/`TASKS.md` ponechány beze změny.
+
+**Why:** File bind mount je vázaný na inode (tmp+rename zápis i host merge ho rozbijí);
+adresářový mount to řeší strukturálně. rw jen v denní skupině, protože tam assistent
+dokumenty podle svého `CLAUDE.md` udržuje. Bez pointer souboru/symlinku — v kontejneru by
+stejně nebyl namountovaný.
+
+**Date:** 2026-10-07

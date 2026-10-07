@@ -47,7 +47,7 @@ samostatné zprávy. To reálně vedlo k deseti a víc zprávám za jeden delš�
 občas navíc nekonzistentně v angličtině, protože to nejsou promyšlené zprávy
 pro uživatele, ale nahlas psané pracovní myšlenky. Každý takový mezikrokový
 text proto začni `[TICHO]` (bridge-ts ho pak do Telegramu vůbec nepošle, viz
-`META_BOT.md`) — jedinou výjimkou je něco, co je potřeba eskalovat hned
+`docs/META_BOT.md`) — jedinou výjimkou je něco, co je potřeba eskalovat hned
 (nejasné zadání, blokující problém), to jde ven bez markeru normálně.
 
 Až doděláš, samotný **výsledek napiš do svého vlastního Telegram chatu** (stejným

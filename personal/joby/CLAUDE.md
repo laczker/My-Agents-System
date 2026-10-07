@@ -47,11 +47,11 @@ ho šumem za každou cenu, ale dát mu dost podkladů pro srovnání a vyjednáv
   paměti běžící `bridge-ts` session a zmizí beze stopy při jakémkoli restartu
   (watchdog, rate limit, cyklení kontextu), takže denní hledání jednou tiše
   přestane běžet, aniž by to vypadalo jako chyba (incident 24.–25.8., viz
-  `META_BOT.md` §3.5). Durable vzor je zpravodajův: samostatný shell skript
+  `docs/META_BOT.md` §3.5). Durable vzor je zpravodajův: samostatný shell skript
   (`personal/joby/daily_job_search.sh`, po vzoru `personal/zpravodaj/daily_digest.sh`)
   spouštěný ze **systémového** `crontab`, nezávisle na `bridge-ts`/Claude session,
   co si sám zavolá `claude -p` a pošle výsledek na Telegram. Přidání řádku do
-  systémového crontabu je sdílená změna (`META_BOT.md` §4) — nech si ji schválit
+  systémového crontabu je sdílená změna (`docs/META_BOT.md` §4) — nech si ji schválit
   uživatelem předem, nezakládej sama.
 - Pokud v daný den nic zajímavého nenajdeš, žádnou zprávu neposílej (žádné
   denní "nic jsem nenašel" hlášení — ticho je informace sama o sobě).
@@ -80,7 +80,7 @@ začátku napiš JEDNU krátkou úvodní zprávu do svého Telegram chatu, co p�
 děláš a od koho úkol je. Mezi touhle úvodní zprávou a finálním výsledkem nepiš
 žádný další text bez `[TICHO]` prefixu (bridge-ts posílá do Telegramu živě
 úplně každý textový blok z takového tahu, i pracovní poznámky mezi kroky — bez
-`[TICHO]` by to znamenalo spam víc zpráv za jeden úkol, viz `META_BOT.md`).
+`[TICHO]` by to znamenalo spam víc zpráv za jeden úkol, viz `docs/META_BOT.md`).
 Výsledek napiš do svého vlastního Telegram chatu, ne přes `SendMessage`.
 Prosté dokončení úkolu bez otázek se `SendMessage` zpátky assistentovi vůbec
 nehlásí. Používej ho jen když k dokončení něco skutečně potřebuješ (dotaz k

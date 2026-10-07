@@ -178,7 +178,7 @@ export class ClaudeProcess {
    * genuine cross-session visibility (a SendMessage from another bot, start/end of
    * batch work, escalation), which should keep going out live unchanged. Nothing
    * forces a bot to use the marker — it's a tool for the bot, not a security
-   * mechanism. See META_BOT.md. */
+   * mechanism. See docs/META_BOT.md. */
   private handleUnsolicitedLine(line: string | null): void {
     if (line === null) return;
     const trimmed = line.trim();

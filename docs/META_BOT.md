@@ -317,27 +317,16 @@ padal na `EACCES` pod non-root userem. Ověřeno buildem + testem s fiktivními
 Telegram tokeny, ale reálnými CLI credentials — `claude -p` i všech 5 profilů
 bridge-ts nastartuje `claude` subprocess bez ENOENT/EACCES.
 
-Iterace 3 (stejné soubory, jen `docker-compose.daily.yml`): bind mount
-`META_BOT.md` a `ARCHITEKTURA.md` (kořen repa) do kontejneru na stejnou cestu,
-**read-only**. Původní záměr byl read-write (`personal/assistant/CLAUDE.md`
-ukládá assistentovi tyhle dokumenty při architektonických změnách i
-zapisovat), ale code review + přímé ověření (test inode před/po `Edit`
-nástroji) potvrdily, že to nejde bezpečně: `Edit` nepíše in-place, ale přes
-tmp-soubor+rename, takže výsledek skončí na novém inode, který bind mount
-jednotlivého souboru vůbec nevidí (mount je vázaný na inode zachycený při
-startu kontejneru, ne na cestu) — zápis by se tiše ztratil, nepropsal by se
-na host. Proto zůstává mount jen ke čtení, dokud nevznikne adresářový mount
-(stejný vzor jako `personal/<profil>`), který tenhle problém neřeší jen
-částečně, ale strukturálně — otevřená položka v `TASKS.md`.
-
-Stejný inode-limit i na straně hostu: pokud host nahradí `META_BOT.md`/
-`ARCHITEKTURA.md` operací, co vytváří nový inode (merge, checkout, rebase —
-přesně to, co dělá krok 5 vývojového cyklu při mergi do `main`), běžící
-kontejner uvidí zastaralý obsah, dokud se nerestartuje. Bez dopadu dnes (žádný
-kontejner neběží souběžně s produkčním provozem) — a na rozdíl od
-kontejnerového zápisu výše tohle budoucí adresářový mount (`TASKS.md`) sám od
-sebe vyřeší (mount vázaný na adresář, ne na konkrétní soubor, vidí živý obsah
-adresáře při každém přístupu).
+Iterace 3 -> iterace 13: `META_BOT.md` a `ARCHITEKTURA.md` žijí v adresáři
+`docs/` v kořeni repa a do kontejnerů se mountuje celý adresář `./docs` →
+`/home/agent/agent-system/docs`: **read-write** v denní skupině (assistent
+tyhle dokumenty podle `personal/assistant/CLAUDE.md` při architektonických
+změnách upravuje), **read-only** v projektové (jen čtou). Původní mount
+jednotlivých souborů (iterace 3, jen `:ro`) nešel: `Edit` píše přes
+tmp-soubor+rename, takže výsledek skončí na novém inode, který file bind mount
+nevidí, a stejně tak host (merge/checkout/rebase) nechával kontejner se
+zastaralým obsahem. Adresářový mount vidí živý obsah adresáře vždy. Nasazení:
+`docker compose up -d` (recreate) obou skupin — schvaluje se v checkpointu.
 
 Iterace 4 (`watchdog.sh`): přidána schopnost zjistit, jestli kontejner
 `daily-bots` běží (`docker compose -f docker-compose.daily.yml ps --status

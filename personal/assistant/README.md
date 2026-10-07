@@ -1,6 +1,6 @@
 # Personal Assistant
 
-Osobní centrální agent podle sekce 8 `ARCHITEKTURA.md`. Jediný agent, který je dnes
+Osobní centrální agent podle sekce 8 `docs/ARCHITEKTURA.md`. Jediný agent, který je dnes
 reálně zapojený přes Telegram bridge (`bridge.py`, běží s `cwd` v tomto adresáři).
 
 ## Soubory
