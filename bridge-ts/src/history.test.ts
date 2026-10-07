@@ -22,7 +22,7 @@ test("small history is not rotated", () => {
 test("file past the size cap is trimmed to the newest exchanges, no tmp left", () => {
   const big = "x".repeat(5_000);
   for (let i = 0; i < 80; i++) appendHistory(`q${i} ${big}`, `a${i}`);
-  assert.ok(statSync(file).size <= 200_000 + 6_000);
+  assert.ok(statSync(file).size <= 200_000);
   const content = readFileSync(file, "utf-8");
   assert.ok(!content.includes("q0 "), "oldest exchange dropped");
   assert.ok(content.includes("q79 "), "newest exchange kept");
@@ -37,6 +37,19 @@ test("rotation keeps escaped delimiters intact and exchanges whole", () => {
   for (let i = 0; i < 60; i++) appendHistory(`md ${i}\n---\n${big}`, "ok\n---\nend");
   const last = getHistory();
   assert.match(last, /Uživatel: md 59\n---\n/);
-  assert.ok(!last.includes("​"));
+  assert.ok(!last.includes("\u200b"));
   assert.equal(last.split("Uživatel: ").length - 1, 10);
+});
+
+test("oversized exchanges are capped so rotation does not re-run on every append", () => {
+  const huge = "z".repeat(30_000);
+  for (let i = 0; i < 12; i++) appendHistory(`h${i} ${huge}`, "ok");
+  const size = statSync(file).size;
+  assert.ok(size <= 200_000, `size ${size}`);
+  appendHistory("tail", "ok");
+  const after = readFileSync(file, "utf-8");
+  assert.ok(after.includes("Uživatel: tail"));
+  assert.ok(statSync(file).size <= 200_000);
+  assert.ok(after.includes("[truncated]"));
+  assert.ok(after.split("---\n").filter((e) => e.trim()).length >= 10);
 });
