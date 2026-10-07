@@ -465,6 +465,16 @@ jinak `up` skončí konfliktem názvu. **Nikdy `--remove-orphans`.** (c) `ARG CL
 v obou Dockerfilech (default = `claude --version` na hostu, 2.1.291) místo natvrdo
 zapsaného pinu 2.1.280.
 
+
+**Iterace 13 — detekce OAuth výpadku (`auth_watch.sh`):** proces může běžet a přesto
+nemít funkční auth (credentials v kontejnerech jsou `:ro`, obnovuje je jen host). `bridge-ts`
+při `auth_error` zapíše `personal/<bot>/auth_error_ts.txt` (po dalším úspěšném tahu ho smaže);
+`watchdog.sh` každou minutu volá `auth_watch.sh`, který marker čte (marker starší než
+`~/.claude/.credentials.json` se ignoruje). Při přechodu "žádný bot postižen" -> "někdo postižen" pošle
+JEDNO Telegram upozornění (přes token prvního postiženého bota, stav v `/tmp/auth_watch_state`),
+při návratu jedno oznámení o obnově. Nic nerestartuje. Omezení: výpadek odhalí jen bot, který
+zpracovává úkol (žádná aktivní sonda); marker se do nasazení nového `bridge-ts` nezapisuje.
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním

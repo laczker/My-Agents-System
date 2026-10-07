@@ -4,7 +4,7 @@ import { ClaudeProcess, runClaude } from "./claudeProcess.js";
 import { getSessionId } from "./session.js";
 import { appendHistory } from "./history.js";
 import { Outbox } from "./outbox.js";
-import { startHeartbeatLoop, touchHeartbeat } from "./heartbeat.js";
+import { clearAuthError, markAuthError, startHeartbeatLoop, touchHeartbeat } from "./heartbeat.js";
 import { downloadAttachment } from "./attachments.js";
 import { Job, loadQueueState, saveQueueState } from "./queue.js";
 import { formatResetTimeLocal } from "./rateLimit.js";
@@ -166,6 +166,7 @@ async function processQueue(): Promise<void> {
         // respond to other messages either, hence broadcast to all allowed chats, same
         // as for rate limiting.
         broadcastMsg(`🔐 Claude autentizace vypadla (OAuth session expired), úkol nedokončen: ${outcome.text}`);
+        markAuthError();
         touchHeartbeat();
         // Unlike rate_limited, there's no timer to resume here — without this return
         // the queue would immediately try the remaining tasks too, each with its own
@@ -176,6 +177,7 @@ async function processQueue(): Promise<void> {
       if (outcome.kind === "error") {
         sendMsg(`⚠️ Úkol selhal: ${outcome.text}`, jobChatId, job.messageId);
       } else {
+        clearAuthError();
         appendHistory(job.userText + job.downloadedFileInfo, outcome.text);
         sendMsg(`✅ Výsledek:\n${outcome.text}`, jobChatId, job.messageId);
       }

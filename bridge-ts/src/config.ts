@@ -39,6 +39,7 @@ export const HISTORY_FILE = `${BOT_DIR}/chat_history.txt`;
 export const INBOX_DIR = `${BOT_DIR}/inbox`;
 export const SESSION_FILE = `${BOT_DIR}/session_id.txt`;
 export const HEARTBEAT_FILE = `${BOT_DIR}/heartbeat_ts.txt`;
+export const AUTH_ERROR_FILE = `${BOT_DIR}/auth_error_ts.txt`;
 export const OUTBOX_FILE = `${BOT_DIR}/outbox_ts.json`;
 export const QUEUE_FILE = `${BOT_DIR}/job_queue_ts.json`;
 export const TURN_LOG_FILE = `${BOT_DIR}/turn_log_ts.jsonl`;

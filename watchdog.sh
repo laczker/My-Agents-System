@@ -39,6 +39,9 @@ throttle_start() {
 # Per-bot cron.txt jobs (personal/<bot>/cron.txt); detached, independent of start throttling below.
 /home/agent/agent-system/run_bot_crons.sh >> /home/agent/agent-system/watchdog.log 2>&1
 
+# OAuth outage detection (alert only, never restarts; see auth_watch.sh).
+/home/agent/agent-system/auth_watch.sh
+
 cd /home/agent/agent-system/bridge-ts || exit 1
 
 # Všech 6 denních profilů (nakup iter. 6, assistant iter. 7, zpravodaj/mailista/joby iter. 8, trener iter. 10) běží v daily-bots

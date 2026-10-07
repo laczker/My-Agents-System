@@ -345,4 +345,21 @@ awaited (no busy signal exists for them); a job parked behind a rate-limit wait
 counts as quiet; with a user message queued behind the current one the script waits
 for that too (up to the cap).
 
+## Watchdog iterace B: detekce OAuth výpadku přes marker soubor
+
+**Decision:** `bridge-ts` zapisuje `personal/<bot>/auth_error_ts.txt` při `auth_error` a maže ho
+po úspěšném tahu. Nový `auth_watch.sh` (volaný z `watchdog.sh`) marker čte a pošle jedno
+Telegram upozornění na výpadek a jedno na obnovu (stav v `/tmp/auth_watch_state`, přechod
+prázdná/neprázdná množina postižených botů). Marker starší než `~/.claude/.credentials.json`
+se bere jako obnovený. Nic se automaticky nerestartuje.
+
+**Why:** restart nepomůže (kontejnery mají credentials `:ro`, refresh dělá jen host), takže
+správná reakce je člověk. Marker je zadarmo (žádná kvóta ani RAM) a bridge už `auth_error`
+spolehlivě rozpoznává.
+
+**Alternatives:** aktivní sonda `claude -p` v intervalu — zamítnuto, spotřebovává kvótu a
+~200 MB RAM na těsném hostu a sama by mohla spustit refresh; číst jen `expiresAt` z credentials
+— expirace je normální, dokud nikdo nevolá claude. Známé omezení: bez provozu se výpadek
+nezjistí; aktivní sonda zůstává možné rozšíření.
+
 **Date:** 2026-10-07
