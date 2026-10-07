@@ -31,7 +31,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    OAuth výpadku. Creds v kontejneru jsou read-only, refresh dělá jen host.
    Velikost: M. **Hotovo (iterace 13, `auth_watch.sh`, viz `META_BOT.md`).**
 8. **Telegram UX, druhá vlna** — `reply_parameters`, `setMessageReaction`,
-   `editMessageText`. Sdílený kód všech botů. Velikost: M.
+   `editMessageText`. Sdílený kód všech botů. Velikost: M. **Hotovo (reply + reakce 👀 v `main`, commit 2025053; `editMessageText` zamítnut, viz `DECISIONS.md`).**
 9. **Přesun devbota do kontejneru** — **zamítnuto 7.10.** Devbot musí zůstat na
    hostu s plným přístupem (nezávislá pojistka při problémech kontejnerů/cronu);
    alternativy (docker socket, žádosti přes soubor) jsou buď bezpečnostní riziko,
