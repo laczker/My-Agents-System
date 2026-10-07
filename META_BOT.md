@@ -441,6 +441,27 @@ smazán (jinak by vznikly dva pollery na jednom tokenu, 409). `checkin.sh` (cron
 13:00/23:00) zůstává na hostu. Pád jen `trener` restartuje celý `daily-bots` (stejně
 jako u ostatních profilů). Dashboard `trener` zatím nezobrazuje (není v `BOTS`).
 
+**Iterace 11 — `~/.claude` jako read-only adresářový mount:** single-file mount
+`.credentials.json` držel po refreshi tokenu na hostu starý (expirovaný) soubor (tmp+rename
+= nový inode) -> 401 v kontejneru. Oba compose soubory proto mountují celý
+`/home/agent/.claude` jako `:ro` adresář (vždy aktuální obsah; kontejner token nikdy
+neobnovuje, takže není race s hostem) a nad něj rw vnořený mount `~/.claude/sessions`
+(registr z iterace 9). `~/.claude.json` zůstává single-file mount (viz TASKS.md devbota).
+
+**Iterace 12 — limity paměti, pinnutý název projektu, jedna verze CLI:** (a) `mem_limit`:
+`daily-bots` 1536m (naměřeno ~745 MiB, ~2x rezerva), `project-bots` 512m (naměřeno ~200 MiB);
+limit omezí jeden vyběhlý profil, aby neshodil druhý kontejner ani hostové boty z ~3,7 GB RAM.
+`restart` zůstává `"no"` — restartuje jedině `watchdog.sh` (docker-level policy by se s jeho
+force-recreate prala). (b) `name: agent-system-daily` / `agent-system-project` + pinnutý
+`container_name` (`agent-system-daily-bots-1`, `agent-system-project-bots-1`): oba soubory dřív sdílely
+project name `agent-system`, takže `up` jednoho hlásil kontejner druhého jako orphan a
+`--remove-orphans` by ho smazal. Názvy kontejnerů se nemění (nic na ně nereferuje podle
+jména; `watchdog.sh` používá `-f` + název služby), ale změna project labelu znamená
+jednorázový recreate: starý kontejner je nutné před `up -d` ručně odstranit (`docker rm -f`),
+jinak `up` skončí konfliktem názvu. **Nikdy `--remove-orphans`.** (c) `ARG CLAUDE_CLI_VERSION`
+v obou Dockerfilech (default = `claude --version` na hostu, 2.1.291) místo natvrdo
+zapsaného pinu 2.1.280.
+
 ## 5. Otevřené otázky (zatím nerozhodnuto, viz `personal/assistant/DECISIONS.md`, 17.8.)
 
 1. Aktivní monitoring/alerting napříč víc agenty najednou (dnes se řeší jen ručním

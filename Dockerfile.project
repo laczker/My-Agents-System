@@ -4,6 +4,13 @@
 # skupiny (.env.<profil> cesty v bridge-ts/src/config.ts).
 FROM node:20-slim
 
+# Single place to bump the claude CLI version: keep it equal to `claude --version` on
+# the host (2.1.291 when written; the previous pin 2.1.280 had drifted). Dockerfile.daily
+# and Dockerfile.project must carry the same default. Override per build with
+# `docker compose build --build-arg CLAUDE_CLI_VERSION=x.y.z`. Bumping needs an image
+# rebuild + container recreate.
+ARG CLAUDE_CLI_VERSION=2.1.291
+
 # `procps` (pgrep/pkill) — watchdog.sh a dashboard restart tlačítko se do kontejneru
 # `exec`ují (stejný důvod jako Dockerfile.daily, iterace 8).
 # `git` navíc oproti Dockerfile.daily — fbalbums si otevírá `git worktree`
@@ -13,9 +20,9 @@ FROM node:20-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Verze pinutá shodně s Dockerfile.daily (claude --version v době psaní) —
+# Version comes from the CLAUDE_CLI_VERSION ARG at the top (same as Dockerfile.daily) —
 # stejný důvod jako tam, sladit ručně při aktualizaci hostitelského CLI.
-RUN npm install -g @anthropic-ai/claude-code@2.1.280
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CLI_VERSION}
 
 WORKDIR /home/agent/agent-system/bridge-ts
 COPY bridge-ts/package.json bridge-ts/package-lock.json ./
