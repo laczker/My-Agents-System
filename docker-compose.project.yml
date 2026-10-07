@@ -33,11 +33,11 @@ services:
       # položka pro obě skupiny, viz TASKS.md.
       - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
       - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
-      # Sdílený token s hostem, read-only — stejný důvod jako denní skupina
-      # (cesta natvrdo, ne ${HOME}, aby se nevyhodnotila prázdná mimo
-      # interaktivní shell).
-      - /home/agent/.claude/.credentials.json:/home/agent/.claude/.credentials.json:ro
+      # Whole ~/.claude as a directory mount (rw): a single-file mount of
+      # .credentials.json kept the stale expired file after a token refresh on the
+      # host (tmp+rename = new inode) -> 401 in the container. Also covers the
+      # sessions/ registry. Hardcoded path, not ${HOME}.
+      - /home/agent/.claude:/home/agent/.claude
       - /home/agent/.claude.json:/home/agent/.claude.json:ro
-      - /home/agent/.claude/sessions:/home/agent/.claude/sessions
       - /tmp/cc-socks:/tmp/cc-socks
     restart: "no"
