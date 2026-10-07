@@ -25,9 +25,9 @@ samotným, ne nad odděleným produktovým repem — žádný `personal/devbot/`
 neexistuje, worktree izolace (`EnterWorktree`/`ExitWorktree`) se otvírá nad
 `agent-system` repem. To zvyšuje riziko: každá iterace sahá na repo, ze kterého
 běží živě 7 produkčních procesů (6 botů + dashboard) sdílejících stejný stroj s
-těsnou pamětí (~3,7 GB RAM, historicky OOM u zpravodaje) — viz `META_BOT.md` §4.
+těsnou pamětí (~3,7 GB RAM, historicky OOM u zpravodaje) — viz `docs/META_BOT.md` §4.
 Nikdy needituj/nerestartuj běžící proces jiného bota přímo, vždy přes
-`watchdog.sh` konvenci (viz `META_BOT.md` §4, incident 18.8.).
+`watchdog.sh` konvenci (viz `docs/META_BOT.md` §4, incident 18.8.).
 
 ## Aktuální zadání (domluveno s uživatelem, 7.9.)
 
@@ -74,7 +74,7 @@ Telegram chatu — nezačínej rovnou kódovat bez schváleného specu.
    ověřit heartbeaty, další iterace.
 
 **Nízká autonomie navíc oproti běžnému kódu** (kvůli sdílenému produkčnímu
-provozu, viz `META_BOT.md` §4): jakýkoliv krok, který by restartoval/zastavil
+provozu, viz `docs/META_BOT.md` §4): jakýkoliv krok, který by restartoval/zastavil
 běžící proces jiného bota, měnil systémový crontab, nebo dočasně shodil
 produkční provoz, jde vždy přes explicitní schválení v checkpointu (krok 4) —
 nikdy jako vedlejší efekt bez zmínky.
@@ -142,7 +142,7 @@ děláš a od koho úkol je. Mezi touhle úvodní zprávou a finálním výsledk
 checkpointem nepiš žádný další text bez `[TICHO]` prefixu (bridge-ts posílá do
 Telegramu živě úplně každý textový blok z takového tahu, i pracovní poznámky
 mezi kroky — bez `[TICHO]` by to znamenalo spam víc zpráv za jeden úkol, viz
-`META_BOT.md`). Výsledek/checkpoint napiš do svého vlastního Telegram chatu, ne
+`docs/META_BOT.md`). Výsledek/checkpoint napiš do svého vlastního Telegram chatu, ne
 přes `SendMessage`. Prosté dokončení úkolu bez otázek se `SendMessage` zpátky
 assistentovi vůbec nehlásí. Používej ho jen když k dokončení něco skutečně
 potřebuješ (dotaz k nejasnému zadání, blokující problém) — v tom případě piš
@@ -156,10 +156,10 @@ skript), není vidět přes `ListAgents`, dashboard ani `job_queue_ts.json` —
 jediná stopa je jeho vlastní log. Musí při chybě aktivně upozornit (Telegram
 zpráva/`SendMessage`), ne jen tiše zapsat řádku do logu a skončit.
 
-## Údržba META_BOT.md
+## Údržba docs/META_BOT.md
 
-Protože pracuju přímo na infrastruktuře, kterou `META_BOT.md` popisuje: při
+Protože pracuju přímo na infrastruktuře, kterou `docs/META_BOT.md` popisuje: při
 jakékoliv změně, která se týká toho, co dokument popisuje (nový port/služba,
 změna v `bridge-ts`, nová konvence napříč boty, dockerizace samotná), musím
-`META_BOT.md` (a případně `ARCHITEKTURA.md`) upravit ve stejném kroku/PR, ne to
+`docs/META_BOT.md` (a případně `docs/ARCHITEKTURA.md`) upravit ve stejném kroku/PR, ne to
 nechat rozjet od reality.

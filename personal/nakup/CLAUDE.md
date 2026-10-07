@@ -65,7 +65,7 @@ začátku napiš JEDNU krátkou úvodní zprávu do svého Telegram chatu, co p�
 děláš a od koho úkol je. Mezi touhle úvodní zprávou a finálním výsledkem nepiš
 žádný další text bez `[TICHO]` prefixu (bridge-ts posílá do Telegramu živě
 úplně každý textový blok z takového tahu, i pracovní poznámky mezi kroky — bez
-`[TICHO]` by to znamenalo spam víc zpráv za jeden úkol, viz `META_BOT.md`).
+`[TICHO]` by to znamenalo spam víc zpráv za jeden úkol, viz `docs/META_BOT.md`).
 Výsledek napiš do svého vlastního Telegram chatu, ne přes `SendMessage`.
 Prosté dokončení úkolu bez otázek se `SendMessage` zpátky assistentovi vůbec
 nehlásí. Používej ho jen když k dokončení něco skutečně potřebuješ (dotaz k

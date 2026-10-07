@@ -35,12 +35,9 @@ services:
       # `git worktree` (EnterWorktree/ExitWorktree) pro vlastní vývojový
       # cyklus, read-only by mu ten krok shodilo hned na startu.
       - /home/agent/fbalbums:/home/agent/fbalbums
-      # Read-only, stejný důvod jako docker-compose.daily.yml (bind mount
-      # vázaný na inode, ne na cestu — rw mount jednotlivého souboru
-      # nefunguje spolehlivě). Adresářový mount fix je sdílená budoucí
-      # položka pro obě skupiny, viz TASKS.md.
-      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
-      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
+      # docs/ as a read-only DIRECTORY mount (not single files: a file mount pins the
+      # inode and goes stale after host merge/checkout). Project bots only read it.
+      - ./docs:/home/agent/agent-system/docs:ro
       # Whole ~/.claude as a READ-ONLY directory mount: a single-file mount of
       # .credentials.json kept the stale expired file after a token refresh on the
       # host (tmp+rename = new inode) -> 401 in the container. The directory always

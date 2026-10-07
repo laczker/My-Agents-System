@@ -16,7 +16,7 @@ Stav ověřen proti kódu, compose souborům, `watchdog.sh` a `git log` k 7.10.2
    Velikost: S.
 3. **Adresářový mount pro `META_BOT.md`/`ARCHITEKTURA.md`** — dnes jen `:ro`
    single-file mount, kontejnerový assistant je nemůže upravovat. Přesun do
-   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M.
+   adresáře + úprava odkazů v ~9 `CLAUDE.md`/`DECISIONS.md`. Velikost: M. **Hotovo (branch batchF-docs-mount, čeká na merge + recreate kontejnerů).**
 4. **Rotace `chat_history.txt`** — `history.ts` čte celý soubor, na disku se
    netrimuje. Sdílený kód všech botů (nasazení restartuje všechny). Velikost: S–M.
 5. **Drobnosti** — ověření SendMessage kontejner → kontejner (iterace 9);

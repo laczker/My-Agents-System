@@ -1,6 +1,6 @@
 #!/bin/bash
 # Daily inbox triage — standalone script, independent of the shared bridge-ts/
-# CronCreate (see META_BOT.md §3.5, DECISIONS.md 27.8.: CronCreate lives only
+# CronCreate (see docs/META_BOT.md §3.5, DECISIONS.md 27.8.: CronCreate lives only
 # in the running process's memory and vanishes without a trace on
 # restart/rate limit).
 #

@@ -1,6 +1,6 @@
 # Docker pilot (personal/devbot/CLAUDE.md) — skupina denních botů (assistant,
 # zpravodaj, mailista, joby, nakup, trener) v jednom kontejneru. Kontejner hlídá
-# watchdog.sh (compose ps + exec pgrep, viz META_BOT.md §4a). Všech 6 profilů běží
+# watchdog.sh (compose ps + exec pgrep, viz docs/META_BOT.md §4a). Všech 6 profilů běží
 # v kontejneru (iterace 6-8 a 10); start-daily.sh čte seznam z daily-profiles.txt
 # (mount), DAILY_PROFILES se tady nenastavuje. Pozor: kvůli `pid: host` vidí pgrep ve
 # watchdogu i hostové procesy, takže hostový proces stejného profilu musí být
@@ -43,15 +43,12 @@ services:
       - ./personal/joby:/home/agent/agent-system/personal/joby
       - ./personal/nakup:/home/agent/agent-system/personal/nakup
       - ./personal/trener:/home/agent/agent-system/personal/trener
-      # Read-only — code review iterace 3 ukázal, že rw mount jednotlivého souboru
-      # nefunguje spolehlivě (Linux bind mount je vázaný na inode, ne na cestu;
-      # `Edit` nástroj píše přes tmp+rename, takže zápis skončí na novém inode,
-      # co bind mount vůbec nevidí). Skutečné rw řešení (adresářový mount) je
-      # samostatná budoucí položka, viz TASKS.md.
       # Profile list shared with watchdog.sh and the dashboard (read by start-daily.sh).
       - ./daily-profiles.txt:/daily-profiles.txt:ro
-      - ./META_BOT.md:/home/agent/agent-system/META_BOT.md:ro
-      - ./ARCHITEKTURA.md:/home/agent/agent-system/ARCHITEKTURA.md:ro
+      # docs/ (META_BOT.md, ARCHITEKTURA.md) as a read-WRITE DIRECTORY mount: the assistant
+      # must update them (personal/assistant/CLAUDE.md). A single-file mount broke on
+      # tmp+rename writes (new inode invisible to the mount); a directory mount does not.
+      - ./docs:/home/agent/agent-system/docs
       # Whole ~/.claude as a READ-ONLY directory mount: a single-file mount of
       # .credentials.json kept the stale expired file after a token refresh on the
       # host (tmp+rename = new inode) -> 401 in the container. The directory always
