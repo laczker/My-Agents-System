@@ -1,4 +1,4 @@
-import { readFileSync, appendFileSync, existsSync } from "node:fs";
+import { readFileSync, appendFileSync, existsSync, statSync, writeFileSync, renameSync } from "node:fs";
 import { HISTORY_FILE, HISTORY_EXCHANGES } from "./config.js";
 
 export function getHistory(): string {
@@ -33,10 +33,26 @@ function unescapeDelimiter(text: string): string {
 // reply in `index.ts`, the unsolicited turn in `claudeProcess.ts`), and without an
 // internal try/catch each of them would have to duplicate the guard separately — one
 // of them actually forgot to (index.ts, until this guard was added here).
+// The file only grows on append, while `getHistory()` needs just the last few
+// exchanges. Once it passes the size limit, it is rewritten with the newest
+// HISTORY_KEEP_EXCHANGES blocks (tmp + rename, so a crash never leaves a half file).
+const HISTORY_MAX_BYTES = 200_000;
+const HISTORY_KEEP_EXCHANGES = 100;
+
+function rotateHistory(): void {
+  if (statSync(HISTORY_FILE).size <= HISTORY_MAX_BYTES) return;
+  const exchanges = readFileSync(HISTORY_FILE, "utf-8").split("---\n").filter((e) => e.trim());
+  const kept = exchanges.slice(-HISTORY_KEEP_EXCHANGES).map((e) => e + "---\n").join("");
+  const tmp = `${HISTORY_FILE}.tmp`;
+  writeFileSync(tmp, kept);
+  renameSync(tmp, HISTORY_FILE);
+}
+
 export function appendHistory(userMsg: string, botMsg: string): void {
   const body = `Uživatel: ${userMsg}\nClaude: ${botMsg}\n`;
   try {
     appendFileSync(HISTORY_FILE, escapeDelimiter(body) + "---\n");
+    rotateHistory();
   } catch (err) {
     console.error("Zápis do chat_history.txt selhal:", err);
   }
