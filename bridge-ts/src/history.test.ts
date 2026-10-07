@@ -41,6 +41,12 @@ test("rotation keeps escaped delimiters intact and exchanges whole", () => {
   assert.equal(last.split("Uživatel: ").length - 1, 10);
 });
 
+test("text that already contains a zero-width space before a newline round-trips", () => {
+  appendHistory("rt-start\n---​\nmid\n---​​\nx\n---\nend", "ok");
+  const last = getHistory().split("Uživatel: ").pop()!;
+  assert.ok(last.startsWith("rt-start\n---​\nmid\n---​​\nx\n---\nend\nClaude: ok"));
+});
+
 test("oversized exchanges are capped so rotation does not re-run on every append", () => {
   const huge = "z".repeat(30_000);
   for (let i = 0; i < 12; i++) appendHistory(`h${i} ${huge}`, "ok");
