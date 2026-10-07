@@ -380,3 +380,15 @@ not in the queue (limit noted in "Self-restart waits for the turn to finish").
 from the arrival of the message, so there is a short gap. Takes effect for the
 restart script only after bridge-ts itself is restarted with this change.
 
+## chat_history.txt rotation: trim in place, drop the old part
+
+**Decision:** `appendHistory()` rotates `chat_history.txt` once it exceeds 200 KB: keeps the
+newest <=100 exchanges and <=100 KB (never fewer than `HISTORY_EXCHANGES`), written to
+`.tmp` and `rename`d. Trimmed exchanges are dropped, not archived.
+
+**Why:** `getHistory()` only serves the last 10 exchanges; an archive would just move the
+unbounded growth elsewhere. Single sync writer per bot process, so tmp+rename is enough.
+The existing count-only cap could rewrite on every append for huge exchanges; the byte
+bound fixes that. Tests: `bridge-ts/src/history.test.ts`.
+
+**Date:** 2026-10-07
