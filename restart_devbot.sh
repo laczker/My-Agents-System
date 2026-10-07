@@ -1,8 +1,8 @@
 #!/bin/bash
 # Restart devbot's own bridge-ts profile to deploy a merged change
 # (cron watchdog must be disabled first to avoid a 409 Conflict race with
-# it restarting the same profile; 60s buffer before kill lets the in-flight
-# reply that approved the merge finish sending before the process dies).
+# it restarting the same profile; before the kill we wait until the in-flight
+# turn has finished: job queue empty and outbox empty -- see "Quiesce" below).
 #
 # Incident 2.10.: this script used to run as a plain foreground child of
 # the very `claude -p` process it kills in the "stop old process" step
@@ -116,7 +116,52 @@ trap on_exit EXIT
 
 log "restart sequence starting (pid $$)"
 
-sleep 60
+# --- Quiesce: let the turn that triggered this restart finish -----------
+# Old behaviour was a blind `sleep 60`, which cut off the reply of any turn
+# longer than that. In bridge-ts/src/index.ts processQueue(), a finished job
+# is shifted off job_queue_ts.json and, in the same synchronous tick, written
+# to chat_history.txt and enqueued into outbox_ts.json (removed from there
+# only after Telegram accepted it). So "queue has no jobs AND outbox is
+# empty" on two consecutive polls means the turn is in history and delivered.
+# Capped by QUIESCE_TIMEOUT: if it never settles (rate-limit wait keeps the
+# job queued, Telegram down) we proceed anyway -- a job still in the queue is
+# retried by the new process and the outbox is flushed on startup, so nothing
+# is lost, only possibly delayed.
+QUEUE_FILE=/home/agent/agent-system/personal/devbot/job_queue_ts.json
+OUTBOX_FILE=/home/agent/agent-system/personal/devbot/outbox_ts.json
+QUIESCE_TIMEOUT=${QUIESCE_TIMEOUT:-600}
+QUIESCE_MIN_WAIT=${QUIESCE_MIN_WAIT:-5}
+
+is_quiet() {
+  # Missing file counts as empty; unreadable/unparsable content does not.
+  if [ -f "$QUEUE_FILE" ]; then
+    tr -d ' \n' < "$QUEUE_FILE" | grep -q '"jobs":\[\]' || return 1
+  fi
+  if [ -f "$OUTBOX_FILE" ]; then
+    [ "$(tr -d ' \n' < "$OUTBOX_FILE")" = "[]" ] || return 1
+  fi
+  return 0
+}
+
+sleep "$QUIESCE_MIN_WAIT"
+q_elapsed=0
+q_quiet=0
+while [ "$q_elapsed" -lt "$QUIESCE_TIMEOUT" ]; do
+  if is_quiet; then
+    q_quiet=$((q_quiet + 1))
+    [ "$q_quiet" -ge 2 ] && break
+  else
+    q_quiet=0
+  fi
+  sleep 2
+  q_elapsed=$((q_elapsed + 2))
+done
+if [ "$q_quiet" -ge 2 ]; then
+  log "devbot quiescent (queue and outbox empty) after $((q_elapsed + QUIESCE_MIN_WAIT))s"
+else
+  log "WARNING: devbot not quiescent after ${QUIESCE_TIMEOUT}s, restarting anyway (queued job is retried, outbox flushed on startup)"
+  send_alert "⚠️ restart_devbot.sh: devbot do ${QUIESCE_TIMEOUT}s neutichl (fronta/outbox neprázdné), restartuji i tak; rozpracovaný úkol se po startu zopakuje."
+fi
 
 if ! crontab -l > "${CRON_BACKUP}.new" 2>/dev/null; then
   log "FATAL: cannot read current crontab, aborting before disabling watchdog"

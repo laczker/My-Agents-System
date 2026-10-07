@@ -321,3 +321,27 @@ notifikaci, uživatel by o hotovém výsledku nevěděl. Logika je v
 `bridge-ts/src/telegramSend.ts`, testy `npm test` (node:test přes tsx).
 
 **Date:** 2026-10-07
+
+## Self-restart waits for the turn to finish (TASKS 6)
+
+**Decision:** `restart_devbot.sh` no longer does a blind `sleep 60` before
+killing devbot. It polls until `job_queue_ts.json` has no jobs and
+`outbox_ts.json` is empty on two consecutive 2s polls (after a 5s minimum
+wait), capped at `QUIESCE_TIMEOUT` (600s). On timeout it restarts anyway and
+sends a Telegram alert. No bridge-ts change.
+
+**Why:** `processQueue()` shifts the finished job off the queue and, in the
+same synchronous tick, appends to `chat_history.txt` and enqueues the reply
+into the outbox (removed only after Telegram accepted it). So "queue empty and
+outbox empty" is gap-free proof that the turn is in history and delivered. A
+turn running longer than 60s used to be killed mid-reply.
+
+**Alternatives:** polling `chat_history.txt` mtime (can't tell "turn done"
+from "other write"); an explicit bridge-ts "drain" signal/endpoint (larger
+diff, new IPC for one script). Fallback on timeout is safe: a job left in the
+queue is retried by the new process and the outbox is flushed on startup.
+Limits: unsolicited cross-session turns are not in the queue and are not
+awaited; with a user message queued behind the current one the script waits
+for that too (up to the cap).
+
+**Date:** 2026-10-07

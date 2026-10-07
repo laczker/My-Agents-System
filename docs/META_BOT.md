@@ -287,6 +287,13 @@ Sdílené (a tedy citlivé — chyba tady zasáhne víc botů najednou):
   takhle jednou spadla. Nové appky/web tooling v tomhle projektu: JS/TS/Node/React
   (uživatelův preferovaný stack, aby si to uměl sám odladit), ale s vědomím, že
   paměť je tenký zdroj — vyhýbat se trvale běžícím těžkým dev-serverům, kde to jde.
+- **Sebe-restart devbota (`restart_devbot.sh`)** — skript se odpojí (`setsid`) a před
+  zabitím procesu čeká, až je tah, který restart vyvolal, dokončen: `job_queue_ts.json`
+  bez jobů (job z fronty mizí ve stejném ticku jako zápis do `chat_history.txt` a
+  vložení odpovědi do `outbox_ts.json`) a prázdný `outbox_ts.json` (odpověď doručena),
+  dvakrát po sobě. Strop `QUIESCE_TIMEOUT` (600 s); po něm restartuje i tak s
+  Telegram alertem — rozpracovaný job se po startu zopakuje a outbox se flushne.
+  Dřívější slepé `sleep 60` useklo odpověď u delších tahů.
 
 ## 4a. Docker pilot — denní boti (od 7.9., `personal/devbot`)
 
